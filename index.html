@@ -1,0 +1,1043 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>KHUZAM Delivery Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<style>
+/* Layout (IBIMS tracker system): navy title-block band with view tabs, stat strip,
+   "due now" log, module panels → building selector → level × element matrix (concrete | reinforcement). */
+:root{
+  --bg:#EDF1F4; --surface:#FFFFFF; --surface-2:#F5F8FA; --ink:#10263A; --muted:#566879; --line:#D2DCE4;
+  --band:#0F2A44; --band-ink:#EAF2F8; --band-muted:#9DB4C8; --band-line:#294765;
+  --accent:#0B7F82; --accent-ink:#FFFFFF; --accent-soft:#DDF1F0;
+  --ok:#1B7446; --ok-soft:#DCF1E5; --warn:#8A5800; --warn-soft:#FBEDCF;
+  --bad:#B3261E; --bad-soft:#FBE2DF; --info:#1D5FA8; --info-soft:#DEEBFA; --idle:#566879; --idle-soft:#E5EBF0;
+  --c-done:#1B8A52; --c-late:#D03B3B;
+  --shadow:0 1px 2px rgba(16,38,58,.06),0 6px 18px rgba(16,38,58,.06);
+  --font-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0A1620; --surface:#11212E; --surface-2:#162A3A; --ink:#E4EDF4; --muted:#93A6B7; --line:#24394B;
+  --band:#081A2B; --band-ink:#EAF2F8; --band-muted:#8FA8BE; --band-line:#1E3852;
+  --accent:#35BDB8; --accent-ink:#06201F; --accent-soft:#123A3C;
+  --ok:#5FCB92; --ok-soft:#143524; --warn:#E9B657; --warn-soft:#3A2C0E;
+  --bad:#F28B82; --bad-soft:#40191A; --info:#7FB4F0; --info-soft:#15304D; --idle:#93A6B7; --idle-soft:#1D3040;
+  --c-done:#2FA86A; --c-late:#E66767;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0A1620; --surface:#11212E; --surface-2:#162A3A; --ink:#E4EDF4; --muted:#93A6B7; --line:#24394B;
+  --band:#081A2B; --band-ink:#EAF2F8; --band-muted:#8FA8BE; --band-line:#1E3852;
+  --accent:#35BDB8; --accent-ink:#06201F; --accent-soft:#123A3C;
+  --ok:#5FCB92; --ok-soft:#143524; --warn:#E9B657; --warn-soft:#3A2C0E;
+  --bad:#F28B82; --bad-soft:#40191A; --info:#7FB4F0; --info-soft:#15304D; --idle:#93A6B7; --idle-soft:#1D3040;
+  --c-done:#2FA86A; --c-late:#E66767;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.25); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.label{font-family:var(--font-display);font-weight:600;font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+.ar{display:block;font-family:"IBM Plex Sans Arabic","Segoe UI",Tahoma,sans-serif;font-weight:500;font-size:max(11px,.72em);letter-spacing:0;text-transform:none;line-height:1.35;direction:rtl;unicode-bidi:isolate;opacity:.82}
+.ar{text-align:left}
+.r .ar,th.r .ar{text-align:right}
+.pill .ar,.code .ar,.tag .ar,.btn .ar{text-align:center;opacity:.9}
+.tag:has(.ar),.code:has(.ar){display:inline-flex;flex-direction:column;align-items:center;line-height:1.25;padding-block:2px}
+.pill:has(.ar){border-radius:10px;text-align:center}
+
+.btn .ar{font-size:11px}
+.btn.bi{flex-direction:column;gap:0;line-height:1.15}
+.views button .ar{font-size:12px;color:inherit}
+.muted{color:var(--muted)}
+
+/* band */
+.band{background:var(--band);color:var(--band-ink);border-bottom:3px solid var(--accent)}
+.band-in{max-width:1320px;margin:0 auto;padding:14px 20px;display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;min-width:0}
+.brand b{font-family:var(--font-display);font-weight:700;font-size:28px;letter-spacing:.14em;line-height:1}
+.brand .ar{font-size:14px;color:var(--band-muted);opacity:1}
+.brand span{font-family:var(--font-display);font-weight:500;font-size:19px;letter-spacing:.08em;text-transform:uppercase;color:var(--band-muted);padding-left:14px;border-left:1px solid var(--band-line)}
+.views{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.views button{font-family:var(--font-display);font-weight:600;font-size:17px;letter-spacing:.08em;text-transform:uppercase;background:transparent;border:0;border-bottom:3px solid transparent;color:var(--band-muted);padding:6px 12px;cursor:pointer;white-space:nowrap}
+.views button:hover{color:var(--band-ink)}
+.views button[aria-pressed="true"]{color:var(--band-ink);border-bottom-color:var(--accent)}
+.views button.exec{border:1px solid var(--accent);border-radius:5px;color:var(--band-ink);margin-right:8px;padding:6px 14px}
+.views button.exec[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.conn{font-size:12px;color:var(--band-muted);display:flex;align-items:center;gap:6px}
+.conn i{width:8px;height:8px;border-radius:50%;background:var(--band-muted);display:inline-block}
+.conn.live i{background:#3ED3A0} .conn.off i{background:#F2A65A}
+.band-tools{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.asof{font-size:12px;color:var(--band-muted)}
+@media (max-width:520px){.band-in{padding-inline:16px}.views button{font-size:15px;padding:5px 9px}.views button.exec{padding:5px 10px;margin-right:4px}}
+
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:500;line-height:1.2;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn:disabled{opacity:.55;cursor:default}
+.btn svg{width:15px;height:15px}
+
+.wrap{max-width:1320px;margin:0 auto;padding-inline:20px;padding-block:20px 48px;display:flex;flex-direction:column;gap:22px}
+@media (max-width:520px){.wrap{padding-inline:16px}}
+
+/* headings */
+.mhead{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:flex-end;justify-content:space-between}
+.mhead h1,.mhead h2{font-family:var(--font-display);font-weight:600;font-size:30px;letter-spacing:.04em;text-transform:uppercase;margin:0;line-height:1.1}
+.mhead p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.sec-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px;margin-bottom:10px}
+.sec-head h2{font-family:var(--font-display);font-weight:600;font-size:24px;letter-spacing:.04em;text-transform:uppercase;margin:0;text-wrap:balance}
+.sec-head p{margin:0;color:var(--muted);font-size:13px}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stat{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.stat b{font-family:var(--font-display);font-weight:600;font-size:34px;line-height:1.05;font-variant-numeric:tabular-nums}
+.stat b em{font-style:normal;font-size:18px;color:var(--muted);margin-left:3px}
+.stat small{color:var(--muted);font-size:12px}
+.stat.alert b{color:var(--bad)} .stat.warnv b{color:var(--warn)} .stat.okv b{color:var(--ok)}
+.stat .meter{margin-block:4px 2px}
+@media (max-width:860px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:first-child{grid-column:1/-1}}
+.meter{height:8px;background:var(--idle-soft);border-radius:4px;overflow:hidden;display:flex}
+.meter i{display:block;height:100%}
+.meter .m-done{background:var(--c-done)} .meter .m-late{background:var(--c-late)}
+.meter.big{height:12px;border-radius:6px}
+
+/* pills, codes */
+.pill{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:2px 10px;white-space:nowrap;background:var(--idle-soft);color:var(--idle)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.info{background:var(--info-soft);color:var(--info)}
+.code{font-family:var(--font-display);font-weight:600;font-size:13px;letter-spacing:.1em;border:1px solid var(--line);background:var(--surface-2);color:var(--muted);border-radius:4px;padding:1px 6px;white-space:nowrap}
+.tag{font-size:11.5px;font-weight:600;letter-spacing:.04em;background:var(--accent-soft);color:var(--accent);border-radius:4px;padding:1px 7px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--idle);flex:none}
+.dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.warn{background:var(--warn)} .dot.info{background:var(--info)}
+
+/* due-now log */
+.tablewrap{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow-x:auto;box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%}
+table.log{min-width:760px}
+th{font-family:var(--font-display);font-weight:600;font-size:13px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);text-align:left;padding:10px;background:var(--surface-2);border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+th.r,td.r{text-align:right}
+td.nowrap{white-space:nowrap}
+td .sub{display:block;font-size:12px;color:var(--muted)}
+tr.is-late td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
+tr.daybreak td{border-top:2px solid var(--line)}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:8px;padding:22px 16px;color:var(--muted);text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.empty p{margin:0;max-width:62ch}
+
+/* module panels */
+.pgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:980px){.pgrid{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0;box-shadow:var(--shadow);text-align:left;cursor:pointer;transition:border-color .15s}
+.panel:hover{border-color:var(--accent)}
+.panel.nodata{box-shadow:none;border-style:dashed}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.proj-t{font-family:var(--font-display);font-weight:700;font-size:28px;letter-spacing:.05em;line-height:1.05;margin:0}
+.bl-mini{display:flex;gap:5px}
+.code.ref{border-style:dashed;color:var(--info)}
+.refnote{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--info-soft);color:var(--info);border:1px solid var(--info);border-radius:8px;padding:10px 14px;font-weight:500;margin-bottom:10px}
+.prog{display:flex;flex-direction:column;gap:6px}
+.prog-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.prog-pct{font-family:var(--font-display);font-weight:600;font-size:30px;line-height:1}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding-block:8px}
+.kpi{display:flex;flex-direction:column;min-width:0}
+.kpi span{font-size:11.5px;color:var(--muted)}
+.kpi b{font-family:var(--font-display);font-weight:600;font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi.alert b{color:var(--bad)}
+.nextline{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px}
+.nextline .plabel{font-family:var(--font-display);font-weight:600;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+
+/* building selector */
+.seg{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.bgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:860px){.bgrid{grid-template-columns:1fr}}
+.bcard{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:10px;text-align:left;cursor:pointer;min-width:0}
+.bcard:hover{border-color:var(--accent)}
+.bcard[aria-pressed="true"]{border-color:var(--band);box-shadow:inset 0 -3px 0 var(--accent),var(--shadow)}
+.bhead{display:flex;gap:12px;align-items:center}
+.bletter{width:46px;height:46px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);display:grid;place-items:center;font-family:var(--font-display);font-weight:700;font-size:28px;flex:none}
+.bcard[aria-pressed="true"] .bletter{background:var(--band);border-color:var(--band);color:var(--band-ink)}
+.bhead div{display:flex;flex-direction:column;min-width:0}
+.bhead b{font-family:var(--font-display);font-weight:600;font-size:21px;letter-spacing:.04em;line-height:1.1}
+.bhead span{font-size:12px;color:var(--muted)}
+
+/* filters */
+.fbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.fbar .seg button{font-family:var(--font-display);font-weight:600;font-size:15px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);padding:5px 14px;border-radius:5px;cursor:pointer;line-height:1.25}
+.fbar .seg button:hover{border-color:var(--accent)}
+.fbar .seg button[aria-pressed="true"]{background:var(--band);border-color:var(--band);color:var(--band-ink);box-shadow:inset 0 -3px 0 var(--accent)}
+.fbar .seg button{display:inline-flex;align-items:center;gap:2px}.fbar .seg button .ar{font-size:12px}
+.fbar .seg button small{font-family:var(--font-body);font-weight:500;font-size:12px;letter-spacing:0;opacity:.7;margin-left:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:12.5px;color:var(--muted);margin-left:auto}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+
+/* matrix */
+table.mx{min-width:720px;table-layout:fixed}
+table.mx col.c-el{width:24%}
+table.mx th small{display:block;font-family:var(--font-body);font-weight:500;letter-spacing:0;text-transform:none;font-size:11.5px}
+tr.lvl td{background:var(--surface-2);padding:10px;border-top:2px solid var(--line)}
+.lvl-in{display:flex;justify-content:space-between;align-items:center;gap:8px 16px;flex-wrap:wrap}
+.lvl-in h3{margin:0;font-family:var(--font-display);font-weight:700;font-size:19px;letter-spacing:.08em;display:flex;gap:10px;align-items:center}
+.lvl-meta{display:flex;gap:14px;align-items:center;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+.lvl-meta .meter{width:110px;height:6px}
+td.el{font-weight:600;font-size:13.5px}
+td.cellw{padding:4px}
+.cell{width:100%;border:1px solid transparent;background:transparent;border-radius:6px;padding:7px 9px;text-align:left;display:flex;flex-direction:column;gap:4px;cursor:pointer;min-width:0}
+.cell:hover{border-color:var(--accent);background:var(--surface-2)}
+.cell .l1,.cell .l2{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.cell .dt{font-weight:600;font-variant-numeric:tabular-nums}
+.cell .l2{font-size:12px;color:var(--muted)}
+.cell.late{background:var(--bad-soft)} .cell.late .cd{color:var(--bad);font-weight:600}
+.cell.soon .cd{color:var(--warn);font-weight:600}
+.cell.week .cd{color:var(--info);font-weight:600}
+.cell.done .dt{text-decoration:line-through;text-decoration-color:var(--ok)} .cell.done .cd{color:var(--ok);font-weight:600}
+.na{color:var(--muted);font-size:12.5px;padding:7px 9px;display:block}
+
+/* dialog */
+.scrim{position:fixed;inset:0;background:rgba(8,20,32,.55);display:grid;place-items:center;padding:16px;z-index:40}
+.dlg{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);width:min(560px,100%);max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.dlg-h{background:var(--band);color:var(--band-ink);padding:12px 18px;border-bottom:3px solid var(--accent);display:flex;flex-direction:column;gap:2px}
+.dlg-h small{font-family:var(--font-display);font-weight:600;letter-spacing:.1em;color:var(--band-muted);font-size:13px}
+.dlg-h h3{font-family:var(--font-display);font-weight:600;font-size:22px;letter-spacing:.06em;text-transform:uppercase;margin:0}
+.dlg-b{padding:16px 18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+.dlg-b .full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field > span{font-size:12px;color:var(--muted);font-weight:500}
+.field input,.field select{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:7px 9px;min-width:0;max-width:100%}
+.field output{border:1px dashed var(--line);border-radius:6px;padding:7px 9px;background:var(--surface-2);min-height:36px;font-variant-numeric:tabular-nums}
+.note{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:8px 10px;font-size:13px}
+.dlg-f{padding:12px 18px 16px;display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;border-top:1px solid var(--line)}
+.dlg-f .left{margin-right:auto}
+.err{color:var(--bad);font-size:13px;margin:0}
+@media (max-width:520px){.dlg-b{grid-template-columns:1fr}}
+@media (max-width:640px){
+  .tablewrap table.mx{min-width:0;table-layout:auto}
+  .tablewrap table.mx thead,.tablewrap table.mx colgroup{display:none}
+  .tablewrap table.mx tbody,.tablewrap table.mx tr.lvl,.tablewrap table.mx tr.lvl td{display:block}
+  .tablewrap table.mx tr:not(.lvl){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .tablewrap table.mx td.el{grid-column:1/-1;border-bottom:0;padding-bottom:0}
+  .tablewrap table.mx td.cellw+td.cellw{border-left:1px dashed var(--line)}
+  .cell::before{content:attr(data-pk);font-family:var(--font-display);font-weight:600;font-size:12px;letter-spacing:.08em;color:var(--muted)}
+}
+/* clickable stat tiles */
+button.stat{border:0;text-align:left;cursor:pointer;font:inherit;color:inherit;position:relative}
+button.stat:hover{background:var(--surface-2)}
+button.stat .go{position:absolute;top:12px;right:14px;font-size:12px;font-weight:600;color:var(--accent)}
+/* due-today notification bar */
+.nbar{background:var(--warn-soft);border-bottom:1px solid var(--warn);color:var(--ink)}
+.nbar.lateonly{background:var(--bad-soft);border-bottom-color:var(--bad)}
+.nb-in{max-width:1320px;margin:0 auto;padding:12px 20px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px 14px;align-items:start}
+@media (max-width:520px){.nb-in{padding-inline:16px;grid-template-columns:auto minmax(0,1fr)}.nb-act{grid-column:1/-1}}
+.nb-ic{width:34px;height:34px;border-radius:8px;background:var(--warn);color:var(--surface);display:grid;place-items:center}
+.nbar.lateonly .nb-ic{background:var(--bad)}
+.nb-ic svg{width:18px;height:18px}
+.nb-t{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.nb-t b{font-family:var(--font-display);font-weight:700;font-size:20px;letter-spacing:.06em;text-transform:uppercase;color:var(--warn)}
+.nbar.lateonly .nb-t b{color:var(--bad)}
+.nb-t span{font-size:13px;color:var(--muted)}
+.nb-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.nb-list li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:13.5px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.nb-list li .w{font-weight:600;margin-right:auto}
+.nb-act{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+.nb-x{border:0;background:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:4px 8px;border-radius:6px}
+.nb-x:hover{background:var(--surface)}
+.dlg.wide{width:min(1060px,100%)}
+.dlg.alert{width:min(760px,100%)}
+.dlg.alert .dlg-f,.dlg.wide .dlg-f{position:sticky;bottom:0;background:var(--surface)}
+.al-sec{display:flex;flex-direction:column;gap:6px}
+.al-sec+.al-sec{margin-top:16px}
+.al-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;border-bottom:2px solid var(--c);padding-bottom:4px}
+.al-h b{font-family:var(--font-display);font-weight:700;font-size:19px;letter-spacing:.06em;text-transform:uppercase;color:var(--c)}
+.al-h span{font-size:12.5px;color:var(--muted)}
+.al-late{--c:var(--bad)} .al-week{--c:var(--warn)}
+.al-row{display:grid;grid-template-columns:74px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.al-late .al-row{background:var(--bad-soft);border-color:transparent}
+.al-d{font-weight:600;font-variant-numeric:tabular-nums;font-size:13px}
+.al-d small{display:block;font-weight:400;color:var(--muted);font-size:11.5px}
+.al-w{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;font-size:13px;min-width:0}
+.al-w .el{font-weight:600}
+.al-r{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-size:12px;color:var(--muted)}
+@media (max-width:520px){.al-row{grid-template-columns:64px minmax(0,1fr)}.al-r{grid-column:1/-1;flex-direction:row;justify-content:space-between;align-items:center}}
+.dlg.wide .dlg-b{display:block}
+/* timeline */
+.tl-zoom{display:flex;gap:6px;align-items:center}
+.tl-zoom .btn[data-tlzoom]{width:36px;justify-content:center;font-size:18px;padding:6px 0}
+.tl-f{row-gap:10px}
+.tl-f .seg+.label{margin-left:8px}
+.tl-legend{margin:0;justify-content:flex-start}
+.tl-key{display:inline-block;width:12px;height:12px;border:2px solid var(--muted);background:var(--muted)}
+.tl-key.cc{border-radius:3px}.tl-key.rf{border-radius:50%}
+.tl-wrap{--lw:200px;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:74vh;box-shadow:var(--shadow);position:relative;margin-top:-8px}
+.tl-glab .sh{display:none}
+@media (max-width:640px){.tl-wrap{--lw:118px}.tl-glab .lg{display:none}.tl-glab .sh{display:inline}.tl-g .tl-lab>.num{display:none}}
+.tl{position:relative;min-width:100%}
+.tl-row{display:flex;height:46px;border-bottom:1px dashed var(--line);position:relative}
+.tl-lab{position:sticky;left:0;z-index:4;width:var(--lw);flex:none;background:var(--surface);border-right:1px solid var(--line);padding:4px 10px;display:flex;flex-direction:column;justify-content:center;min-width:0;overflow:hidden}
+.tl-lab b{font-family:var(--font-display);font-weight:600;font-size:15px;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-lab span{font-size:11.5px;white-space:nowrap}
+.tl-track{position:relative;flex:none;z-index:2}
+.tl-g{height:40px;border-bottom:1px solid var(--line);border-top:2px solid var(--line)}
+.tl-g .tl-lab{background:var(--surface-2);flex-direction:row;align-items:center;justify-content:space-between;gap:6px}
+.tl-g .tl-track{background:var(--surface-2)}
+.tl-glab{border:0;background:none;padding:0;cursor:pointer;color:var(--ink);text-align:left;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tl-glab:hover b{color:var(--accent)}
+.tl-glab .pill{font-size:10.5px;padding:0 6px;align-self:flex-start}
+.tl-head{position:sticky;top:0;z-index:6;height:50px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.tl-head .tl-lab{z-index:7;background:var(--surface-2)}
+.tl-months,.tl-days{position:absolute;left:0;right:0;height:24px}
+.tl-months{top:2px}.tl-days{top:24px}
+.tl-mon{position:absolute;top:2px;padding-left:6px;font-family:var(--font-display);font-weight:600;font-size:14px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;border-left:2px solid var(--line)}
+.tl-day{position:absolute;top:0;text-align:center;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.1;padding-top:3px}
+.tl-day small{display:block;font-size:9.5px;opacity:.75}
+.tl-day.we{color:var(--ink);opacity:.55}
+.tl-day.now{color:var(--accent-ink);background:var(--accent);border-radius:4px;font-weight:700;opacity:1}
+.tl-cols{position:absolute;top:0;bottom:0;left:var(--lw);pointer-events:none;z-index:1}
+.tl-wk{position:absolute;top:0;bottom:0;background:var(--idle-soft);opacity:.55}
+.tl-mline{position:absolute;top:0;bottom:0;width:0;border-left:1px solid var(--line)}
+.tl-now{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--accent);z-index:5}
+.tl-now b{display:none}
+.tl-bar{position:absolute;top:22px;height:2px;background:var(--line);border-radius:2px}
+.tl-bar.late{background:var(--bad);opacity:.5}
+.tl-chip{position:absolute;transform:translateX(-50%);width:18px;height:18px;border:2px solid var(--c);background:var(--c);color:var(--surface);font:700 10px/1 var(--font-body);display:grid;place-items:center;padding:0;cursor:pointer;z-index:3;transition:transform .1s}
+.tl-chip:hover,.tl-chip:focus-visible{transform:translateX(-50%) scale(1.3);z-index:4}
+.tl-chip.cc{top:4px;border-radius:4px}
+.tl-chip.rf{top:24px;border-radius:50%}
+.st-late{--c:var(--bad)} .st-soon{--c:var(--warn)} .st-week{--c:var(--info)} .st-done{--c:var(--ok)}
+.st-later{--c:var(--idle)} .tl-chip.st-later{background:var(--surface);color:var(--idle)}
+#tltip{position:fixed;z-index:60;background:var(--band);color:var(--band-ink);border:1px solid var(--band-line);border-radius:8px;padding:8px 10px;font-size:12.5px;max-width:min(420px,calc(100vw - 16px));pointer-events:none;box-shadow:var(--shadow)}
+#tltip .tt-h{font-weight:600}
+#tltip .tt-d{color:var(--band-muted);margin-bottom:4px;font-variant-numeric:tabular-nums}
+#tltip .tt-h span{font-family:var(--font-display);letter-spacing:.08em;color:var(--band-muted)}
+#tltip .tt-r{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:2px 0}
+#tltip .pill{font-size:11px}
+
+/* gantt (primavera style) */
+.g-wrap{--gw:590px;--rh:30px}
+.g{position:relative;display:flex;min-width:100%}
+.g-left{position:sticky;left:0;z-index:5;width:var(--gw);flex:none;background:var(--surface);border-right:2px solid var(--line);box-shadow:4px 0 8px -6px rgba(16,38,58,.25)}
+.g-right{position:relative;flex:none}
+.g-row{height:var(--rh);border-bottom:1px solid var(--line);position:relative}
+.g-left .g-row{display:grid;grid-template-columns:minmax(0,1fr) 60px 60px 54px 54px 100px;align-items:center}
+.g-c{padding:0 6px;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.g-c.r{text-align:right}
+.g-name{padding-left:calc(8px + var(--ind,0)*16px);display:flex;align-items:center;gap:6px}
+.g-name .code{font-size:11px;padding:0 4px}
+.g-act{overflow:hidden;text-overflow:ellipsis}
+.g-ar{display:inline;font-size:11.5px;opacity:.7}
+.g-hd{position:sticky;top:0;z-index:6;height:50px;background:var(--band);color:var(--band-ink);border-bottom:3px solid var(--accent)}
+.g-left .g-hd .g-c{font-family:var(--font-display);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;white-space:normal;line-height:1.1}
+.g-left .g-hd .g-c .ar{font-size:10.5px;color:var(--band-muted)}
+.g-scale .tl-mon{color:var(--band-ink);border-left-color:var(--band-line)}
+.g-scale .tl-day{color:var(--band-muted)}
+.g-scale .tl-day.we{color:var(--band-ink);opacity:.5}
+.g-m{background:color-mix(in srgb,var(--band) 10%,var(--surface))}
+.g-m .g-name b{font-family:var(--font-display);font-size:15px;letter-spacing:.08em}
+.g-b{background:var(--surface-2)}
+.g-b .g-name b{font-family:var(--font-display);font-size:14px;letter-spacing:.06em}
+.g-l .g-name b{font-family:var(--font-display);font-weight:600;font-size:13.5px;letter-spacing:.06em}
+.g-m .g-c,.g-b .g-c{font-weight:600}
+.g-tog{border:0;background:none;color:var(--muted);cursor:pointer;width:16px;padding:0;font-size:12px;flex:none}
+.g-tog:hover{color:var(--accent)}
+.g-name .pill{font-size:10.5px;padding:0 6px}
+.g-pc{display:inline-block;width:38px;height:6px;border-radius:3px;background:var(--idle-soft);overflow:hidden;vertical-align:middle;margin-right:5px}
+.g-pc i{display:block;height:100%;background:var(--c-done)}
+.g-cols{position:absolute;top:0;bottom:0;left:0;right:0;pointer-events:none;z-index:0}
+.g-right>.g-row{z-index:1;background:transparent}
+.g-right>.g-m{background:color-mix(in srgb,var(--band) 6%,transparent)}
+.g-right>.g-b{background:color-mix(in srgb,var(--idle-soft) 45%,transparent)}
+.g-right .g-hd{z-index:4}
+.g-right>.g-hd{background:var(--band)}
+.g-left .g-hd .g-c{letter-spacing:.04em}
+@media (max-width:900px){.g-wrap{--gw:180px}.g-wrap .g-left .g-row{grid-template-columns:minmax(0,1fr)}.g-wrap .g-left .g-c:not(.g-name){display:none}.g-name .g-ar{display:none}.g-name{padding-left:calc(4px + var(--ind,0)*8px)}}
+.g-cols .tl-now{z-index:3;width:2px;background:var(--bad);opacity:.85}
+.g-bar{position:absolute;top:calc(var(--rh)/2 - 7px);height:14px;border:1px solid var(--c);background:color-mix(in srgb,var(--c) 75%,var(--surface));border-radius:2px;padding:0;cursor:pointer;z-index:2}
+.g-bar.rf{background:repeating-linear-gradient(135deg,var(--c) 0 5px,color-mix(in srgb,var(--c) 70%,var(--surface)) 5px 8px)}
+.g-bar.st-later{background:color-mix(in srgb,var(--info) 35%,var(--surface));border-color:var(--info)}
+.g-bar.st-later.rf{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--info) 45%,var(--surface)) 0 5px,color-mix(in srgb,var(--info) 20%,var(--surface)) 5px 8px)}
+.g-bar:hover,.g-bar:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+.g-lbl{position:absolute;top:calc(var(--rh)/2 - 8px);font-size:11.5px;color:var(--muted);white-space:nowrap;pointer-events:none;z-index:2}
+.g-lbl.s{font-family:var(--font-display);font-weight:600;letter-spacing:.06em;color:var(--ink);font-size:12px}
+.g-sum{position:absolute;top:calc(var(--rh)/2 - 3px);height:6px;background:var(--ink);z-index:2}
+.g-sum::before,.g-sum::after{content:"";position:absolute;top:0;border-top:8px solid var(--ink);border-left:5px solid transparent;border-right:5px solid transparent}
+.g-sum::before{left:-5px}.g-sum::after{right:-5px}
+.g-sum.late{background:var(--bad)}.g-sum.late::before,.g-sum.late::after{border-top-color:var(--bad)}
+.g-sum i{display:block;height:100%;background:var(--c-done)}
+.g-key{display:inline-block;width:18px;height:10px;border:1px solid var(--info);background:color-mix(in srgb,var(--info) 35%,var(--surface));border-radius:2px}
+.g-key.rf{background:repeating-linear-gradient(135deg,var(--info) 0 4px,color-mix(in srgb,var(--info) 30%,var(--surface)) 4px 6px)}
+.g-key.sum{height:5px;background:var(--ink);border:0;border-radius:0}
+.g-key.dd{width:2px;height:14px;background:var(--bad);border:0}
+
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--band);color:var(--band-ink);padding:10px 16px;border-radius:8px;border:1px solid var(--band-line);box-shadow:var(--shadow);max-width:calc(100vw - 32px);z-index:50}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<header class="band">
+  <div class="band-in">
+    <div class="brand"><b>SUSTRA</b><span>AL KHUZAM · Delivery Tracker<i class="ar" style="font-style:normal">متابعة تسليمات مشروع الخزام</i></span></div>
+    <nav class="views" id="views" aria-label="View"></nav>
+    <div class="band-tools"><span class="asof num" id="asof"></span><div class="conn" id="conn"><i></i><span>Connecting…</span></div></div>
+  </div>
+</header>
+<div id="notice" aria-live="polite"></div>
+<main class="wrap" id="app"></main>
+<input type="file" id="xlsIn" accept=".xlsx,.xls,.xlsm" hidden>
+<div id="layer"></div>
+<div id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+"use strict";
+const MODS=["M1","M2","M3"];
+const BLD=["Z","A","B"];
+const LEVELS=["GROUND","FIRST","SECOND","THIRD","FOURTH","FIFTH","SIXTH","SEVENTH","EIGHTH","ROOF","TOP ROOF"];
+const ELS=["STRUCTURE","SOG","SLAB","COLUMNS & SHEAR WALLS","COREWALL","BEAMS","STAIRS","POOL"];
+const PK={CONC:"Concrete",RFT:"Reinforcement"};
+const PKC={CONC:"CONC",RFT:"RFT"};
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAY=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const DAR=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+const DAYL=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const ST={late:"Overdue",soon:"Due ≤ 3 days",week:"This week",later:"Upcoming",done:"Delivered"};
+const ST_AR={late:"متأخر",soon:"خلال 3 أيام",week:"الأسبوع ده",later:"قادم",done:"اتسلّم"};
+const PK_AR={CONC:"خرسانة",RFT:"تسليح"};
+const bi=(en,ar)=>en+'<span class="ar" lang="ar">'+ar+'</span>';
+const daysAr=n=>n===1?"يوم":n===2?"يومين":(n<=10?n+" أيام":n+" يوم");
+const SCLS={late:"bad",soon:"warn",week:"info",later:"idle",done:"ok"};
+
+const S={sched:{},status:{},db:null,canWrite:null,ready:false,conn:"wait",view:{screen:"home",mod:null,b:null,filter:"all"}};
+try{const v=JSON.parse(localStorage.getItem("khz-view")||"null");if(v&&v.screen)Object.assign(S.view,v)}catch(e){}
+
+const $=s=>document.querySelector(s);
+const h=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad=n=>String(n).padStart(2,"0");
+function todayISO(){const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+function P(s){const [y,m,d]=s.split("-").map(Number);return {y,m,d,t:Date.UTC(y,m-1,d)}}
+function diffDays(iso){return Math.round((P(iso).t-P(todayISO()).t)/864e5)}
+function wd(iso){return new Date(P(iso).t).getUTCDay()}
+function fmt(iso,opt){const p=P(iso);let s=pad(p.d)+" "+MON[p.m-1];if(opt==="day")s=DAY[wd(iso)]+" "+s;if(opt==="full")s=DAYL[wd(iso)]+", "+s+" "+p.y;return s}
+const plural=(n,w)=>n+" "+w+(n===1?"":"s");
+const key=it=>it.mod+"-"+it.id;
+function isDone(it){const x=S.status[key(it)];return !!(x&&x.done)}
+function status(it){if(isDone(it))return "done";const n=diffDays(it.due);return n<0?"late":n<=3?"soon":n<=7?"week":"later"}
+function countdown(it){
+  if(isDone(it)){const x=S.status[key(it)];return x.doneAt?"Delivered "+fmt(x.doneAt):"Delivered"}
+  const n=diffDays(it.due);
+  if(n<0)return plural(-n,"day")+" overdue";if(n===0)return "Due today";if(n===1)return "Due tomorrow";return plural(n,"day")+" left";
+}
+function countdownAr(it){
+  if(isDone(it))return "اتسلّم";
+  const n=diffDays(it.due);
+  if(n<0)return "متأخر "+daysAr(-n);if(n===0)return "النهارده";if(n===1)return "بكرة";return "باقي "+daysAr(n);
+}
+const cdBi=it=>bi(countdown(it),countdownAr(it));
+function dwgs(it){const x=S.status[key(it)];return x&&typeof x.dwgs==="number"?x.dwgs:it.dwgs}
+function itemsOf(mod){const s=S.sched[mod];return s&&Array.isArray(s.items)?s.items.map(i=>Object.assign({mod},i)):[]}
+function allItems(){return MODS.flatMap(itemsOf)}
+function refsOf(mod){const s=S.sched[mod];return s&&s.refs&&typeof s.refs==="object"?s.refs:{}}
+function bItems(mod,b){const ref=refsOf(mod)[b];return ref&&ref!==mod?itemsOf(ref).filter(i=>i.b===b):itemsOf(mod).filter(i=>i.b===b)}
+const refTag=(mod,b)=>{const ref=refsOf(mod)[b];return ref?`<span class="pill info">${bi("REF · "+modName(ref),"نفس "+modAr(ref))}</span>`:""};
+function stats(list){
+  const o={total:list.length,done:0,late:0,soon:0,week:0,later:0,dw:0,dwDone:0,next:null};
+  for(const it of list){const s=status(it);o[s]++;const d=dwgs(it)||0;o.dw+=d;if(s==="done")o.dwDone+=d;
+    if(s!=="done"&&s!=="late"&&(!o.next||it.due<o.next.due))o.next=it}
+  return o;
+}
+const pct=(a,b)=>b?Math.round(a/b*100):0;
+const modName=m=>"Module "+m.slice(1);
+const modAr=m=>"موديول "+m.slice(1);
+const elShort=e=>e==="COLUMNS & SHEAR WALLS"?"COLUMNS & S.W.":e;
+const meter=(s,big)=>`<div class="meter${big?" big":""}" title="${s.done} delivered · ${s.late} overdue"><i class="m-done" style="width:${pct(s.done,s.total)}%"></i><i class="m-late" style="width:${pct(s.late,s.total)}%"></i></div>`;
+const stat=(label,val,unit,sub,cls,kind)=>kind?`<button type="button" class="stat ${cls||""}" data-list="${kind}" title="Show the list"><span class="go">View ›</span><span class="label">${label}</span><b>${val}${unit?`<em>${unit}</em>`:""}</b><small>${sub||"&nbsp;"}</small></button>`:`<div class="stat ${cls||""}"><span class="label">${label}</span><b>${val}${unit?`<em>${unit}</em>`:""}</b><small>${sub||"&nbsp;"}</small></div>`;
+function saveView(){try{localStorage.setItem("khz-view",JSON.stringify(S.view))}catch(e){}}
+function go(v){Object.assign(S.view,v);saveView();render();window.scrollTo({top:0})}
+const ICON_UP='<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11V2.5M4.5 6L8 2.5 11.5 6M2.5 11.5v2h11v-2"/></svg>';
+
+function statStrip(list,scopeTxt){
+  const s=stats(list);
+  return `<section class="stats" aria-label="Summary">
+    ${stat(bi("Packages","البنود"),s.total,"",scopeTxt,"","all")}
+    ${stat(bi("Delivered","اتسلّم"),s.done,"",pct(s.done,s.total)+"% of packages","okv","done")}
+    ${stat(bi("Overdue","متأخر"),s.late,"","past target, not delivered",s.late?"alert":"","late")}
+    ${stat(bi("Due in 7 days","خلال 7 أيام"),s.soon+s.week,"",s.soon+" within 3 days",s.soon?"warnv":"","week")}
+    ${stat(bi("Drawings","اللوحات"),s.dwDone,"/ "+s.dw,"delivered / expected")}
+  </section>`;
+}
+
+/* ---------- OVERVIEW ---------- */
+function renderHome(){
+  const all=allItems();const st=stats(all);
+  let html=`<div class="mhead"><div><h1>${bi("All modules","كل الموديولات")}</h1><p>${S.ready?(st.next?"Next delivery: <b>"+fmt(st.next.due,"full")+"</b> · "+modName(st.next.mod)+" · Building "+st.next.b+" · "+h(st.next.l)+" "+h(elShort(st.next.e))+" ("+PK[st.next.p]+")":(all.length?"No upcoming deliveries left.":"No schedules uploaded yet.")):"Loading the schedule…"}</p></div></div>`;
+  if(!S.ready){return html+`<div class="empty"><p>${S.conn==="off"?(S.connErr||"The schedule could not be loaded."):"Loading…"}</p></div>`}
+  html+=statStrip(all,MODS.filter(m=>itemsOf(m).length).length+" of 3 modules loaded");
+  const due=all.filter(it=>["late","soon","week"].includes(status(it))).sort((a,b)=>a.due.localeCompare(b.due)||a.mod.localeCompare(b.mod)||BLD.indexOf(a.b)-BLD.indexOf(b.b));
+  html+=`<section><div class="sec-head"><h2>${bi("Due now","عليه الدور")}</h2><p>${bi("Overdue packages plus everything due in the next 7 days, across all modules","المتأخر + كل اللي ميعاده خلال 7 أيام في كل الموديولات")}</p></div>`;
+  html+=due.length?logTable(due):`<div class="empty"><p>Nothing overdue and nothing due this week.${st.next?" Next delivery is "+fmt(st.next.due,"full")+".":""}</p></div>`;
+  html+=`</section><section><div class="sec-head"><h2>${bi("Modules","الموديولات")}</h2><p>${bi("Open a module to see buildings Z · A · B","افتح الموديول عشان تشوف المباني Z · A · B")}</p></div><div class="pgrid">`;
+  for(const m of MODS){
+    const list=itemsOf(m);
+    if(!list.length){html+=`<button type="button" class="panel nodata" data-go="${m}"><div class="card-top"><h3 class="proj-t">${bi(modName(m).toUpperCase(),modAr(m))}</h3><div class="bl-mini">${BLD.map(b=>`<span class="code${refsOf(m)[b]?" ref":""}" title="${refsOf(m)[b]?"Reference of "+modName(refsOf(m)[b]):""}">${b}</span>`).join("")}</div></div><p class="muted" style="margin:0">${bi("No schedule yet. Open the module and upload its Excel timeline.","لسه مفيش جدول — افتح الموديول وارفع شيت الإكسيل")}</p></button>`;continue}
+    const s=stats(list);
+    html+=`<button type="button" class="panel" data-go="${m}">
+      <div class="card-top"><h3 class="proj-t">${bi(modName(m).toUpperCase(),modAr(m))}</h3><div class="bl-mini">${BLD.map(b=>`<span class="code${refsOf(m)[b]?" ref":""}" title="${refsOf(m)[b]?"Reference of "+modName(refsOf(m)[b]):""}">${b}</span>`).join("")}</div></div>
+      <div class="prog"><div class="prog-top"><span class="label">${bi("Delivered","اتسلّم")}</span><span class="prog-pct num">${pct(s.done,s.total)}%</span></div>${meter(s,true)}</div>
+      <div class="kpis"><div class="kpi"><span>${bi("Packages","البنود")}</span><b>${s.done}/${s.total}</b></div><div class="kpi${s.late?" alert":""}"><span>${bi("Overdue","متأخر")}</span><b>${s.late}</b></div><div class="kpi"><span>${bi("Drawings","اللوحات")}</span><b>${s.dwDone}/${s.dw}</b></div></div>
+      ${Object.keys(refsOf(m)).length?`<p class="muted" style="margin:0;font-size:12.5px">${bi("Own scope: Building "+[...new Set(list.map(i=>i.b))].join(", ")+" · "+Object.keys(refsOf(m)).join(" & ")+" = reference of "+modName(Object.values(refsOf(m))[0]),"المبنى "+[...new Set(list.map(i=>i.b))].join("، ")+" خاص بالموديول · "+Object.keys(refsOf(m)).join(" و ")+" نفس "+modAr(Object.values(refsOf(m))[0]))}</p>`:""}
+      <div class="nextline"><span class="plabel">${bi("Next delivery","أقرب تسليم")}</span>${s.next?`<span><b class="num">${fmt(s.next.due,"day")}</b> · ${s.next.b} · ${h(s.next.l)} ${h(elShort(s.next.e))} <span class="code">${PKC[s.next.p]}</span></span>`:`<span>${s.done===s.total?bi("All delivered","كله اتسلّم"):"—"}</span>`}</div>
+    </button>`;
+  }
+  return html+`</div></section>`;
+}
+function logTable(list){
+  let prev=null;
+  const rows=list.map(it=>{const s=status(it);const d=dwgs(it);const br=prev!==null&&prev!==it.due;prev=it.due;
+    return `<tr class="${s==="late"?"is-late ":""}${br?"daybreak":""}">
+      <td class="nowrap num"><b>${fmt(it.due)}</b><span class="sub">${DAYL[wd(it.due)]} · ${DAR[wd(it.due)]}</span></td>
+      <td class="nowrap"><span class="tag">${bi(modName(it.mod).toUpperCase(),modAr(it.mod))}</span></td>
+      <td class="nowrap"><span class="code">${it.b}</span></td>
+      <td class="nowrap"><b>${h(it.l)}</b></td>
+      <td>${h(it.e)}</td>
+      <td class="nowrap"><span class="code">${bi(PKC[it.p],PK_AR[it.p])}</span></td>
+      <td class="r num">${d??"—"}</td>
+      <td class="nowrap"><span class="pill ${SCLS[s]}">${cdBi(it)}</span></td>
+      <td class="r"><button type="button" class="btn small bi" data-open="${h(key(it))}">${S.canWrite===false?bi("View","عرض"):bi("Update","تحديث")}</button></td></tr>`}).join("");
+  return `<div class="tablewrap"><table class="log"><thead><tr><th>${bi("Target date","ميعاد التسليم")}</th><th>${bi("Module","الموديول")}</th><th>${bi("Bldg","المبنى")}</th><th>${bi("Level","الدور")}</th><th>${bi("Element","العنصر")}</th><th>${bi("Package","النوع")}</th><th class="r">${bi("Dwgs","لوحات")}</th><th>${bi("Status","الحالة")}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+/* ---------- MODULE ---------- */
+function renderModule(){
+  const m=S.view.mod;const list=itemsOf(m);const sch=S.sched[m];
+  let html=`<div class="mhead"><div><h1>${bi(modName(m),modAr(m))}</h1><p>${sch&&sch.source?"Source: "+h(sch.source)+(sch.importedAt?" · uploaded "+fmt(sch.importedAt.slice(0,10)):""):(S.ready?"No schedule uploaded for this module yet.":"Loading…")}</p></div>
+    ${S.canWrite!==false&&S.ready?`<button type="button" class="btn${list.length?"":" primary"}" data-import>${ICON_UP}<span>${list.length?bi("Replace schedule (Excel)","تحديث الجدول من الإكسيل"):bi("Upload schedule (Excel)","رفع شيت المواعيد")}</span></button>`:""}</div>`;
+  if(!list.length)return html+`<div class="empty"><p>Upload the Excel timeline for ${modName(m)}. Use the same layout as the TIMELINE sheet: levels × elements, with Concrete Dimensions and Reinforcement columns per building. Drawing counts are picked up from a sheet with an EXP. NO. DWGS column.<span class="ar" lang="ar">ارفع شيت الإكسيل بنفس شكل شيت الـ TIMELINE (الأدوار × العناصر، ولكل مبنى خرسانة وتسليح) وهيتقرا تلقائي.</span></p></div>`;
+  html+=statStrip(list,"Building "+[...new Set(list.map(i=>i.b))].join(" · ")+(Object.keys(refsOf(m)).length?" (own scope)":""));
+  const refs=refsOf(m);const blds=BLD.filter(b=>list.some(i=>i.b===b)||refs[b]).concat([...new Set(list.map(i=>i.b))].filter(b=>!BLD.includes(b)));
+  if(!S.view.b||!blds.includes(S.view.b))S.view.b=blds[0];
+  html+=`<section><div class="sec-head"><h2>${bi("Buildings","المباني")}</h2><p>${bi("Select a building to see its levels","اختار المبنى عشان تشوف أدواره")}</p></div><div class="bgrid">`;
+  for(const b of blds){
+    const bl=bItems(m,b);const s=stats(bl);const lv=LEVELS.filter(l=>bl.some(i=>i.l===l));
+    html+=`<button type="button" class="bcard" data-b="${b}" aria-pressed="${S.view.b===b}">
+      <div class="bhead"><span class="bletter">${b}</span><div><b>${bi("BUILDING "+b,"مبنى "+b)}</b><span>${plural(lv.length,"level")} · ${h(lv[0]||"")} → ${h(lv[lv.length-1]||"")}</span></div></div>${refTag(m,b)}
+      <div class="prog"><div class="prog-top"><span class="label">${bi("Delivered","اتسلّم")}</span><span class="num"><b>${pct(s.done,s.total)}%</b></span></div>${meter(s)}</div>
+      <div class="kpis"><div class="kpi"><span>${bi("Packages","البنود")}</span><b>${s.done}/${s.total}</b></div><div class="kpi${s.late?" alert":""}"><span>${bi("Overdue","متأخر")}</span><b>${s.late}</b></div><div class="kpi"><span>${bi("Drawings","اللوحات")}</span><b>${s.dwDone}/${s.dw}</b></div></div>
+      <div class="nextline"><span class="plabel">${bi("Next","أقرب تسليم")}</span>${s.next?`<span><b class="num">${fmt(s.next.due,"day")}</b> · ${h(s.next.l)} ${h(elShort(s.next.e))} <span class="code">${PKC[s.next.p]}</span></span>`:`<span>${s.done===s.total?bi("All delivered","كله اتسلّم"):"—"}</span>`}</div>
+    </button>`;
+  }
+  html+=`</div></section>`;
+  const bl=bItems(m,S.view.b);const refM=refs[S.view.b];
+  const inF=(it,f)=>{const s=status(it);return f==="all"||(f==="soon"?(s==="soon"||s==="week"):s===f)};
+  const F=[["all",bi("All","الكل")],["late",bi("Overdue","متأخر")],["soon",bi("Due in 7 days","خلال 7 أيام")],["later",bi("Upcoming","قادم")],["done",bi("Delivered","اتسلّم")]];
+  html+=`<section id="matrix"><div class="sec-head"><h2>${bi("Building "+S.view.b+" · Levels &amp; elements","مبنى "+S.view.b+" · الأدوار والعناصر")}</h2><p>${bi("Click any package to mark it delivered or set its drawing count","اضغط على أي خانة عشان تعلّمها اتسلّمت أو تعدّل عدد اللوحات")}</p></div>
+    ${refM?`<div class="refnote"><span>${bi("Building "+S.view.b+" is a reference of "+modName(refM)+" — same drawings and dates. Deliveries marked here update "+modName(refM)+" too.","مبنى "+S.view.b+" نفس "+modAr(refM)+" بالظبط — نفس اللوحات والمواعيد، وأي تسليم تعلّمه هنا بيتعلّم في "+modAr(refM)+".")}</span><button type="button" class="btn small bi" data-go="${refM}">${bi("Open "+modName(refM),"افتح "+modAr(refM))}</button></div>`:""}
+    <div class="fbar"><span class="label">${bi("Show","عرض")}</span><div class="seg" role="group" aria-label="Filter">${F.map(([k,t])=>`<button type="button" data-f="${k}" aria-pressed="${S.view.filter===k}">${t}<small>${bl.filter(i=>inF(i,k)).length}</small></button>`).join("")}</div>
+    <div class="legend">${["late","soon","week","later","done"].map(k=>`<span><i class="dot ${SCLS[k]}"></i><span>${bi(ST[k],ST_AR[k])}</span></span>`).join("")}</div></div></section>`;
+  const lvls=LEVELS.filter(l=>bl.some(i=>i.l===l)).concat([...new Set(bl.map(i=>i.l))].filter(l=>!LEVELS.includes(l)));
+  let body="";
+  for(const l of lvls){
+    const li=bl.filter(i=>i.l===l);const s=stats(li);
+    const els=ELS.filter(e=>li.some(i=>i.e===e)).concat([...new Set(li.map(i=>i.e))].filter(e=>!ELS.includes(e)));
+    const rows=els.map(e=>{const c=li.find(i=>i.e===e&&i.p==="CONC"),r=li.find(i=>i.e===e&&i.p==="RFT");
+      const f=S.view.filter;if(!((c&&inF(c,f))||(r&&inF(r,f))))return "";
+      return `<tr><td class="el">${h(e)}</td><td class="cellw">${cellHtml(c,f,inF)}</td><td class="cellw">${cellHtml(r,f,inF)}</td></tr>`}).join("");
+    if(!rows)continue;
+    const dates=li.map(i=>i.due).sort();
+    body+=`<tr class="lvl"><td colspan="3"><div class="lvl-in"><h3>${h(l)}${s.late?` <span class="pill bad">${bi(s.late+" overdue",s.late+" متأخر")}</span>`:""}</h3><div class="lvl-meta"><span class="num">${fmt(dates[0])} → ${fmt(dates[dates.length-1])}</span><span class="num">${s.done}/${s.total} delivered</span><span class="num">${s.dw} dwgs</span>${meter(s)}</div></div></td></tr>${rows}`;
+  }
+  html+=body?`<div class="tablewrap" style="margin-top:-10px"><table class="mx"><colgroup><col class="c-el"><col><col></colgroup><thead><tr><th>${bi("Element","العنصر")}</th><th>${bi("Concrete","خرسانة")}<small>Concrete dimensions</small></th><th>${bi("Reinforcement","تسليح")}<small>RFT detailing</small></th></tr></thead><tbody>${body}</tbody></table></div>`:`<div class="empty"><p>No packages match this filter.</p></div>`;
+  return html;
+}
+function cellHtml(it,f,inF){
+  if(!it)return `<span class="na">— not in scope<span class="ar">خارج النطاق</span></span>`;
+  if(!inF(it,f))return `<span class="na">&nbsp;</span>`;
+  const s=status(it);const d=dwgs(it);
+  return `<button type="button" class="cell ${s}" data-pk="${PKC[it.p]} · ${PK_AR[it.p]}" data-open="${h(key(it))}" aria-label="${h(it.l+" "+it.e+" "+PK[it.p])}">
+    <span class="l1"><span class="dt">${fmt(it.due,"day")}</span><span class="pill ${SCLS[s]}">${bi(ST[s],ST_AR[s])}</span></span>
+    <span class="l2"><span class="cd">${cdBi(it)}</span><span class="num">${d!=null?plural(d,"dwg"):"— dwgs"}</span></span></button>`;
+}
+
+/* ---------- DIALOGS ---------- */
+let onSave=null;
+function layer(inner,save){onSave=save;$("#layer").innerHTML=`<div class="scrim" data-scrim>${inner}</div>`;const L=$("#layer");const f=["input","select",".dlg-f .btn.primary",".dlg-f [data-close]"].map(q=>L.querySelector(q)).find(Boolean);f&&f.focus({preventScroll:true})}
+function closeLayer(){const was=!!$("#layer").innerHTML;$("#layer").innerHTML="";onSave=null;if(was)render()}
+let tt;function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTimeout(tt);tt=setTimeout(()=>{el.hidden=true},3200)}
+function openItem(k){
+  const it=allItems().find(x=>key(x)===k);if(!it)return;
+  const s=status(it);const x=S.status[k]||{};const d=dwgs(it);
+  const ro=S.canWrite===false||!S.db;
+  layer(`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT">
+    <div class="dlg-h"><small>${modName(it.mod).toUpperCase()} · BUILDING ${it.b} · ${PK[it.p].toUpperCase()}<span class="ar">${modAr(it.mod)} · مبنى ${it.b} · ${PK_AR[it.p]}</span></small><h3 id="dlgT">${h(it.l)} · ${h(it.e)}</h3></div>
+    <div class="dlg-b">
+      <div class="field"><span>${bi("Target date","ميعاد التسليم")}</span><output class="num">${fmt(it.due,"full")}<span class="ar">${DAR[wd(it.due)]}</span></output></div>
+      <div class="field"><span>${bi("Status","الحالة")}</span><output><span class="pill ${SCLS[s]}">${cdBi(it)}</span></output></div>
+      ${it.dwgs!=null?`<div class="field"><span>${bi("Drawings in Excel","اللوحات في الشيت")}</span><output class="num">${it.dwgs}</output></div>`:""}
+      ${ro?`<div class="field"><span>${bi("Expected drawings","عدد اللوحات المتوقع")}</span><output class="num">${d??"—"}</output></div>`:`<label class="field"><span>${bi("Expected drawings","عدد اللوحات المتوقع")}</span><input id="fDw" type="number" min="0" step="1" inputmode="numeric" value="${d??""}" placeholder="e.g. 8"></label>`}
+      ${it.note?`<div class="note full">${h(it.note)}</div>`:""}
+      ${ro?`<p class="muted full" style="margin:0;font-size:13px">${S.db?bi("You have view-only access.","عندك صلاحية عرض بس."):bi("Editing is not available in this view.","التعديل مش متاح هنا.")}</p>`:
+      `<label class="field"><span>${bi("Planned start","بداية الشغل")}</span><input id="fStart" type="date" max="${it.due}" value="${startOf(it)}"></label>
+       <div class="field"><span>${bi("Duration","المدة")}</span><output class="num">${dayDiff(startOf(it),it.due)} days</output></div>
+       <label class="field"><span>${bi("Delivery date","تاريخ التسليم")}</span><input id="fDoneAt" type="date" value="${x.doneAt||todayISO()}"></label>
+       <div class="field"><span>${bi("Delivered?","اتسلّم؟")}</span><output>${s==="done"?bi("Yes — "+fmt(x.doneAt||todayISO(),"day"),"أيوه"):bi("Not yet","لسه")}</output></div>`}
+    </div>
+    <div class="dlg-f"><p class="err" id="dlgErr" role="alert"></p>
+      ${ro?`<button type="button" class="btn bi" data-close>${bi("Close","إغلاق")}</button>`:`${s==="done"?`<button type="button" class="btn danger left bi" data-save="undo">${bi("Mark not delivered","إلغاء التسليم")}</button>`:""}<button type="button" class="btn bi" data-close>${bi("Cancel","إلغاء")}</button><button type="button" class="btn bi" data-save="keep">${bi("Save drawings","حفظ اللوحات")}</button><button type="button" class="btn primary bi" data-save="done">${s==="done"?bi("Update delivery","تحديث التسليم"):bi("Mark delivered","تم التسليم")}</button>`}
+    </div></div>`,async btn=>{
+    const mode=btn.dataset.save;const dwIn=$("#fDw").value.trim();const doneAt=$("#fDoneAt").value||todayISO();
+    const prev=S.status[k]||{};const next={item:it.id,mod:it.mod,updatedAt:new Date().toISOString()};
+    const stIn=$("#fStart")?$("#fStart").value:"";if(stIn&&stIn<=it.due&&stIn!==defStart(it))next.start=stIn;
+    if(dwIn!=="")next.dwgs=Math.max(0,Math.round(+dwIn));
+    if(mode==="done"){next.done=true;next.doneAt=doneAt}else if(mode==="undo"){next.done=false}else if(prev.done){next.done=true;next.doneAt=prev.doneAt}else next.done=false;
+    try{await S.db.collection("status").doc(k).set(next);closeLayer();toast(mode==="done"?"Marked delivered · اتعلّم إنه اتسلّم":mode==="undo"?"Marked not delivered · اتلغى التسليم":"Saved · اتحفظ")}
+    catch(e){$("#dlgErr").textContent=e&&e.code==="invalid_argument"?"You don't have permission to edit.":"Not saved. Try again.";if(e&&e.code==="invalid_argument")S.canWrite=false}
+  });
+}
+
+/* ---------- EXCEL IMPORT ---------- */
+function loadXLSX(){return window.XLSX?Promise.resolve(window.XLSX):new Promise((res,rej)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";s.onload=()=>res(window.XLSX);s.onerror=()=>rej(new Error("load"));document.head.appendChild(s)})}
+//PARSER-START
+function parseWorkbook(XLSX,wb){
+  const LV={GEOUND:"GROUND","GRAOUND":"GROUND"};
+  const iso=(y,m,d)=>(m>=1&&m<=12&&d>=1&&d<=31)?y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0"):null;
+  const cell=(ws,r,c)=>ws[XLSX.utils.encode_cell({r:r-1,c:c-1})];
+  const txt=x=>x&&x.v!=null?String(x.v).trim():"";
+  function walk(ws){
+    if(!ws||!ws["!ref"])return null;
+    const ref=XLSX.utils.decode_range(ws["!ref"]);const maxR=ref.e.r+1,maxC=ref.e.c+1;
+    const cols=[];let cur=null;
+    for(let c=3;c<=maxC;c+=2){
+      const hd=txt(cell(ws,1,c));
+      if(/BUILDING|BLDG|مبنى/i.test(hd)){const m=hd.match(/\(\s*([A-Z0-9]+)\s*\)/i)||hd.match(/(?:BUILDING|BLDG)\s*([A-Z0-9]+)/i);cur=m?m[1].toUpperCase():hd}
+      if(!cur)continue;
+      const pk=txt(cell(ws,2,c));if(!pk)continue;
+      cols.push({c,b:cur,p:/REINF|RFT|تسليح/i.test(pk)?"RFT":"CONC",sub:txt(cell(ws,3,c+1))});
+    }
+    if(!cols.length)return null;
+    const rows=[];let lvl=null;
+    for(let r=4;r<=maxR;r++){
+      const a=txt(cell(ws,r,1));if(a)lvl=LV[a.toUpperCase()]||a.toUpperCase();
+      const el=txt(cell(ws,r,2));if(!el||!lvl)continue;
+      for(const k of cols)rows.push({b:k.b,l:lvl,e:el.toUpperCase().replace(/\s+/g," "),p:k.p,dc:cell(ws,r,k.c),sc:cell(ws,r,k.c+1),sub:k.sub});
+    }
+    return rows;
+  }
+  const sheets=wb.SheetNames.map(n=>({n,rows:walk(wb.Sheets[n])})).filter(s=>s.rows);
+  if(!sheets.length)throw new Error("format");
+  const textDate=x=>x&&x.t==="s"&&/^\s*\d{1,2}\/\d{1,2}\/\d{4}/.test(x.v);
+  const isDate=x=>x&&((x.t==="n"&&x.v>30000&&x.v<80000)||x.t==="d"||textDate(x));
+  const score=s=>s.rows.filter(r=>isDate(r.dc)).length+(/TIMELINE|SCHEDULE/i.test(s.n)?1000:0);
+  const dsh=sheets.slice().sort((a,b)=>score(b)-score(a))[0];
+  // Excel misread dd/mm as mm/dd whenever the sheet also holds text dates like 25/10/2026
+  const swap=dsh.rows.some(r=>textDate(r.dc)&&+r.dc.v.match(/^\s*(\d{1,2})/)[1]>12);
+  function toISO(x){
+    if(!x)return null;
+    if(x.t==="n"){const d=XLSX.SSF.parse_date_code(x.v);if(!d)return null;return (swap&&d.d<=12)?iso(d.y,d.d,d.m):iso(d.y,d.m,d.d)}
+    if(x.t==="d"){const d=new Date(x.v);return iso(d.getFullYear(),d.getMonth()+1,d.getDate())}
+    if(x.t==="s"){const m=x.v.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return iso(+m[3],+m[2],+m[1]);const m2=x.v.match(/(\d{4})-(\d{2})-(\d{2})/);if(m2)return iso(+m2[1],+m2[2],+m2[3])}
+    return null;
+  }
+  const k4=r=>r.b+"|"+r.l+"|"+r.e+"|"+r.p;
+  const counts={};
+  for(const s of sheets)for(const r of s.rows){if(/NO|DWG|عدد/i.test(r.sub)&&r.sc&&r.sc.t==="n"&&r.sc.v>=0&&r.sc.v<1000)counts[k4(r)]=r.sc.v}
+  const items=[];const seen=new Set();
+  for(const r of dsh.rows){
+    const due=toISO(r.dc);if(!due)continue;
+    const id=r.b+"-"+r.l.replace(/ /g,"_")+"-"+r.e.split(/\s/)[0].replace(/&/g,"")+"-"+r.p;
+    if(seen.has(id))continue;seen.add(id);
+    let dw=counts[k4(r)];if(dw==null&&r.sc&&r.sc.t==="n"&&/NO|DWG/i.test(r.sub))dw=r.sc.v;
+    const note=(/NOTE|ملاحظ/i.test(r.sub)&&r.sc&&r.sc.t==="s")?String(r.sc.v).trim():"";
+    items.push({id,b:r.b,l:r.l,e:r.e,p:r.p,due,dwgs:dw==null?null:dw,note});
+  }
+  return {items,sheet:dsh.n,swapped:swap};
+}
+//PARSER-END
+//GANTT-START
+/* Reads the KHUZAM PARK Gantt workbook ("Gantt Schedule" + "Drawing Register"):
+   structural concrete / reinforcement packages from the First floor up. */
+function parseGantt(XLSX,wb){
+  const gn=wb.SheetNames.find(n=>/gantt/i.test(n));if(!gn)return null;
+  const rows=XLSX.utils.sheet_to_json(wb.Sheets[gn],{header:1,raw:true,defval:null});
+  const hi=rows.findIndex(r=>r&&String(r[0]||"").trim().toLowerCase()==="package");if(hi<0)return null;
+  const H=rows[hi].map(x=>String(x||"").trim().toLowerCase());
+  const ci=k=>H.findIndex(x=>x.startsWith(k));
+  const C={pkg:0,disc:ci("discipline"),desc:ci("drawing package"),sh:ci("sheets"),st:ci("start"),is:ci("initial issue"),cl:ci("closure")};
+  const iso=(y,m,d)=>y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+  const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  function D(v){if(v==null||v==="")return null;
+    if(typeof v==="number"){const d=XLSX.SSF.parse_date_code(v);return d?iso(d.y,d.m,d.d):null}
+    if(v instanceof Date)return iso(v.getFullYear(),v.getMonth()+1,v.getDate());
+    const s=String(v);let m=s.match(/(\d{4})-(\d{2})-(\d{2})/);if(m)return iso(+m[1],+m[2],+m[3]);
+    m=s.match(/(\d{1,2})[-\s/]([A-Za-z]{3})[-\s/](\d{2,4})/);if(m&&MON[m[2].toLowerCase()])return iso(+m[3]<100?2000+ +m[3]:+m[3],MON[m[2].toLowerCase()],+m[1]);
+    m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return iso(+m[3],+m[2],+m[1]);return null}
+  const NL=l=>{l=String(l||"").trim().toUpperCase().replace(/\s+/g," ");return l==="SISXTH"?"SIXTH":(l==="TOP OF ROOF"?"TOP ROOF":l)};
+  // drawing register: sheets per package per level
+  const reg={};const rn=wb.SheetNames.find(n=>/register/i.test(n));
+  if(rn){const rr=XLSX.utils.sheet_to_json(wb.Sheets[rn],{header:1,raw:true,defval:null});
+    const rh=rr.findIndex(r=>r&&r.some(x=>String(x||"").trim()==="Package")&&r.some(x=>String(x||"").trim()==="Level"));
+    if(rh>=0){const pI=rr[rh].findIndex(x=>String(x||"").trim()==="Package"),lI=rr[rh].findIndex(x=>String(x||"").trim()==="Level");
+      for(const r of rr.slice(rh+1)){if(!r||!r[pI])continue;const k=String(r[pI]).trim();const l=NL(r[lI]);(reg[k]=reg[k]||{});reg[k][l]=(reg[k][l]||0)+1}}}
+  const UP=["SECOND","THIRD","FOURTH","FIFTH","SIXTH","SEVENTH","EIGHTH"],RF=["ROOF","TOP ROOF"];
+  const mods={M1:[],M2:[],M3:[]};const towers=new Set();const pk=[];
+  for(const r of rows.slice(hi+1)){
+    if(!r||!/^P\d+/i.test(String(r[0]||"")))continue;
+    if(!/STRUCT/i.test(String(r[C.disc]||"")))continue;
+    const parts=String(r[C.desc]||"").split("/").map(s=>s.trim());if(parts.length<3)continue;
+    const p=/REINF/i.test(parts[0])?"RFT":/CONCRETE/i.test(parts[0])?"CONC":null;if(!p)continue;
+    const area=parts[1],lvl=parts[2].toLowerCase();
+    if(/ground|substructure/.test(lvl))continue;                       // First floor and above only
+    let mod,b;const mm=area.match(/module\s*(\d+)/i),tm=area.match(/tower\s*([A-Z])/i);
+    if(mm){mod="M"+mm[1];b="Z"}else if(tm){mod="M1";b=tm[1].toUpperCase();towers.add(b)}else continue;
+    if(!mods[mod])mods[mod]=[];
+    const pkg=String(r[0]).trim(),start=D(r[C.st]),due=D(r[C.is]),closure=D(r[C.cl]),sheets=+r[C.sh]||null;
+    if(!due)continue;
+    let levels;
+    if(/first/.test(lvl))levels=[["FIRST",sheets]];
+    else{const want=/roof/.test(lvl)?RF:UP;const g=reg[pkg]||{};levels=want.filter(l=>g[l]).map(l=>[l,g[l]]);
+      if(!levels.length)levels=[[/roof/.test(lvl)?"ROOF":"UPPER FLOORS",sheets]]}
+    pk.push(pkg);
+    for(const [l,n] of levels)mods[mod].push({id:b+"-"+l.replace(/ /g,"_")+"-STRUCTURE-"+p,b,l,e:"STRUCTURE",p,start,due,closure,pkg,dwgs:n,
+      note:"Package "+pkg+" · "+parts.join(" / ")+" · Initial issue "+due+(closure?" · Closure "+closure:"")});
+  }
+  if(!pk.length)return null;
+  const refs={};towers.forEach(t=>refs[t]="M1");
+  return {sheet:gn,packages:[...new Set(pk)],modules:mods,refs};
+}
+//GANTT-END
+
+function saveGanttDialog(file,res){
+  const all=Object.values(res.modules).flat();const dates=all.map(i=>i.due).sort();
+  const line=m=>{const it=res.modules[m]||[];const dw=it.reduce((a,i)=>a+(i.dwgs||0),0);return `<div class="field"><span>${modName(m)}</span><output class="num">${it.length} packages · ${dw} dwgs${m!=="M1"&&Object.keys(res.refs).length?" · "+Object.keys(res.refs).join(" & ")+" = Module 1":""}</output></div>`};
+  layer(`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="impT">
+    <div class="dlg-h"><small>KHUZAM PARK GANTT · STRUCTURAL<span class="ar">جانت الخزام · إنشائي</span></small><h3 id="impT">${bi("Replace all modules","تحديث كل الموديولات")}</h3></div>
+    <div class="dlg-b">
+      <div class="field full"><span>${bi("File","الملف")}</span><output>${h(file.name)}</output></div>
+      <div class="field full"><span>${bi("Packages read","الباكدجات")}</span><output>${h(res.packages.join(", "))}</output></div>
+      ${MODS.map(line).join("")}
+      <div class="field"><span>${bi("Initial issue range","فترة الإصدار")}</span><output class="num">${fmt(dates[0])} → ${fmt(dates[dates.length-1])}</output></div>
+      <p class="muted full" style="margin:0;font-size:12.5px">${bi("First floor and above only (Ground and substructure are skipped). This replaces the schedules of all three modules.","من الدور الأول لفوق بس (الأرضي والأساسات مش داخلين). ده هيستبدل جداول الموديولات الثلاثة.")}</p>
+    </div>
+    <div class="dlg-f"><p class="err" id="dlgErr" role="alert"></p><button type="button" class="btn bi" data-close>${bi("Cancel","إلغاء")}</button><button type="button" class="btn primary bi" data-save="imp">${bi("Save all modules","حفظ الموديولات")}</button></div></div>`,async()=>{
+      try{for(const m of MODS){const doc={module:m,source:file.name,sheet:res.sheet,importedAt:new Date().toISOString(),items:res.modules[m]||[]};if(m!=="M1"&&Object.keys(res.refs).length)doc.refs=res.refs;await S.db.collection("schedules").doc(m).set(doc)}
+        closeLayer();toast("All modules updated · اتحدّثت كل الموديولات");go({screen:"home"})}
+      catch(e){$("#dlgErr").textContent=e&&e.code==="invalid_argument"?"You don't have permission to upload schedules.":"Not saved. Try again."}
+    });
+}
+async function importFile(file){
+  let XLSX;try{XLSX=await loadXLSX()}catch(e){toast("Couldn't load the Excel reader. Try again.");return}
+  let res;
+  let wbk;try{wbk=XLSX.read(await file.arrayBuffer(),{type:"array"})}catch(e){toast("Couldn't open this file.");return}
+  try{const g=parseGantt(XLSX,wbk);if(g)return saveGanttDialog(file,g)}catch(e){console.error(e)}
+  try{res=parseWorkbook(XLSX,wbk)}catch(e){toast("This file isn't in the expected timeline layout.");return}
+  if(!res.items.length){toast("No target dates found in this file.");return}
+  const it=res.items;const dates=it.map(i=>i.due).sort();const bl=[...new Set(it.map(i=>i.b))];
+  const target=S.view.mod||"M1";
+  layer(`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="impT">
+    <div class="dlg-h"><small>EXCEL TIMELINE</small><h3 id="impT">${bi("Review before saving","مراجعة قبل الحفظ")}</h3></div>
+    <div class="dlg-b">
+      <div class="field full"><span>${bi("File","الملف")}</span><output>${h(file.name)}</output></div>
+      <div class="field"><span>${bi("Dates read from sheet","شيت المواعيد")}</span><output>${h(res.sheet)}</output></div>
+      <div class="field"><span>${bi("Packages","البنود")}</span><output class="num">${it.length}</output></div>
+      <div class="field"><span>${bi("Buildings","المباني")}</span><output>${bl.join(" · ")}</output></div>
+      <div class="field"><span>${bi("Date range","الفترة")}</span><output class="num">${fmt(dates[0])} → ${fmt(dates[dates.length-1])}</output></div>
+      <div class="field"><span>${bi("With drawing counts","بنود بعدد لوحات")}</span><output class="num">${it.filter(i=>i.dwgs!=null).length}</output></div>
+      <label class="field"><span>${bi("Save to","احفظه في")}</span><select id="impMod">${MODS.map(m=>`<option value="${m}"${m===target?" selected":""}>${modName(m)}${itemsOf(m).length?" (replaces current)":""}</option>`).join("")}</select></label>
+      <p class="muted full" style="margin:0;font-size:12.5px">Packages already marked delivered keep their status when you replace a schedule.<span class="ar">البنود اللي اتعلّمت إنها اتسلّمت هتفضل زي ما هي.</span></p>
+    </div>
+    <div class="dlg-f"><p class="err" id="dlgErr" role="alert"></p><button type="button" class="btn bi" data-close>${bi("Cancel","إلغاء")}</button><button type="button" class="btn primary bi" data-save="imp">${bi("Save schedule","حفظ الجدول")}</button></div></div>`,async()=>{
+      const m=$("#impMod").value;
+      try{await S.db.collection("schedules").doc(m).set(Object.assign({module:m,source:file.name,sheet:res.sheet,importedAt:new Date().toISOString(),items:it},(()=>{const old=refsOf(m),keep={};for(const b in old)if(!it.some(i=>i.b===b))keep[b]=old[b];return Object.keys(keep).length?{refs:keep}:{}})()));closeLayer();toast(modName(m)+" schedule saved");go({screen:"mod",mod:m,filter:"all"})}
+      catch(e){$("#dlgErr").textContent=e&&e.code==="invalid_argument"?"You don't have permission to upload schedules.":"Not saved. Try again."}
+    });
+}
+
+/* ---------- LISTS + DUE-TODAY NOTICE ---------- */
+const LISTS={
+  late:{t:"Overdue packages",a:"البنود المتأخرة",f:it=>status(it)==="late",e:"Nothing is overdue.",ea:"مفيش حاجة متأخرة."},
+  week:{t:"Due in the next 7 days",a:"التسليمات خلال 7 أيام",f:it=>{const s=status(it);return s==="soon"||s==="week"},e:"Nothing due in the next 7 days.",ea:"مفيش تسليمات خلال 7 أيام."},
+  done:{t:"Delivered packages",a:"البنود اللي اتسلّمت",f:it=>status(it)==="done",e:"Nothing marked delivered yet.",ea:"لسه مفيش حاجة اتعلّمت إنها اتسلّمت."},
+  all:{t:"All packages",a:"كل البنود",f:()=>true,e:"No packages.",ea:"مفيش بنود."},
+  today:{t:"Due today",a:"تسليمات النهارده",f:it=>!isDone(it)&&diffDays(it.due)===0,e:"Nothing due today.",ea:"مفيش تسليمات النهارده."}
+};
+function openList(kind){
+  const L=LISTS[kind];if(!L)return;
+  const mod=S.view.screen==="mod"?S.view.mod:null;
+  const list=(mod?itemsOf(mod):allItems()).filter(L.f).sort((a,b)=>kind==="done"?b.due.localeCompare(a.due):a.due.localeCompare(b.due)||a.mod.localeCompare(b.mod)||BLD.indexOf(a.b)-BLD.indexOf(b.b));
+  const dw=list.reduce((a,i)=>a+(dwgs(i)||0),0);
+  layer(`<div class="dlg wide" role="dialog" aria-modal="true" aria-labelledby="lsT">
+    <div class="dlg-h"><small>${mod?modName(mod).toUpperCase()+'<span class="ar">'+modAr(mod)+'</span>':'ALL MODULES<span class="ar">كل الموديولات</span>'}</small><h3 id="lsT">${bi(L.t,L.a)}</h3></div>
+    <div class="dlg-b"><p class="muted" style="margin:0 0 10px">${bi(plural(list.length,"package")+" · "+plural(dw,"drawing"),list.length+" بند · "+dw+" لوحة")}</p>
+    ${list.length?logTable(list):`<div class="empty"><p>${bi(L.e,L.ea)}</p></div>`}</div>
+    <div class="dlg-f"><button type="button" class="btn bi" data-close>${bi("Close","إغلاق")}</button></div></div>`,null);
+}
+const ICON_BELL='<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5V7a4 4 0 018 0v4.5l1.2 1.3H2.8zM6.5 14a1.6 1.6 0 003 0"/></svg>';
+function noticeKey(){return "khz-notice-off-"+todayISO()}
+function renderNotice(){
+  const host=$("#notice");if(!host)return;
+  if(!S.ready){host.innerHTML="";return}
+  let off=false;try{off=localStorage.getItem(noticeKey())==="1"}catch(e){}
+  const today=allItems().filter(LISTS.today.f).sort((a,b)=>a.mod.localeCompare(b.mod)||BLD.indexOf(a.b)-BLD.indexOf(b.b));
+  const late=allItems().filter(LISTS.late.f);
+  if(off||(!today.length&&!late.length)){host.innerHTML="";return}
+  const dw=today.reduce((a,i)=>a+(dwgs(i)||0),0);
+  const alertBtn=(typeof SYS_NOTIFY!=="undefined"&&SYS_NOTIFY&&"Notification" in window&&Notification.permission==="default")?`<button type="button" class="btn small bi" data-sysnotif>${bi("Desktop alerts","تنبيهات على الجهاز")}</button>`:"";
+  const lateBtn=late.length?`<button type="button" class="btn small bi danger" data-list="late">${bi(late.length+" overdue · View",late.length+" متأخر · عرض")}</button>`:"";
+  if(!today.length){
+    host.innerHTML=`<div class="nbar lateonly" role="status"><div class="nb-in"><span class="nb-ic">${ICON_BELL}</span>
+      <div class="nb-t"><b>${bi(plural(late.length,"overdue package"),late.length+" بند متأخر")}</b><span>${bi("Past target date and not marked delivered","عدّى ميعادهم ولسه ما اتعلّموش إنهم اتسلّموا")}</span></div>
+      <div class="nb-act">${lateBtn}${alertBtn}<button type="button" class="nb-x" data-dismiss aria-label="Hide for today">×</button></div></div></div>`;return}
+  host.innerHTML=`<div class="nbar" role="status"><div class="nb-in"><span class="nb-ic">${ICON_BELL}</span>
+    <div><div class="nb-t"><b>${bi("Delivery due today","عليك تسليم النهارده")}</b><span class="num">${bi(plural(today.length,"package")+" · "+plural(dw,"drawing"),today.length+" بند · "+dw+" لوحة")}</span></div>
+    <ul class="nb-list">${today.map(it=>{const d=dwgs(it);return `<li><span class="tag">${bi(modName(it.mod).toUpperCase(),modAr(it.mod))}</span><span class="code">${bi(it.b,"مبنى")}</span><span class="w">${h(it.l)} · ${h(it.e)}</span><span class="code">${bi(PKC[it.p],PK_AR[it.p])}</span><span class="num"><b>${d??"—"}</b> ${bi("dwgs","لوحة")}</span>${S.canWrite!==false&&S.db?`<button type="button" class="btn small bi" data-open="${h(key(it))}">${bi("Mark delivered","تم التسليم")}</button>`:""}</li>`}).join("")}</ul></div>
+    <div class="nb-act">${lateBtn}${alertBtn}<button type="button" class="nb-x" data-dismiss aria-label="Hide for today">×</button></div></div></div>`;
+}
+function sysNotify(){
+  if(typeof SYS_NOTIFY==="undefined"||!SYS_NOTIFY||!("Notification" in window)||Notification.permission!=="granted"||!S.ready)return;
+  const t=allItems().filter(LISTS.today.f);if(!t.length)return;
+  const k="khz-notified-"+todayISO()+"-"+t.length;try{if(localStorage.getItem(k))return;localStorage.setItem(k,"1")}catch(e){}
+  const dw=t.reduce((a,i)=>a+(dwgs(i)||0),0);
+  try{new Notification("KHUZAM · "+plural(t.length,"delivery")+" due today",{body:t.map(i=>modName(i.mod)+" · "+i.b+" · "+i.l+" "+elShort(i.e)+" "+PKC[i.p]+(dwgs(i)?" · "+dwgs(i)+" dwgs":"")).join("\n")+"\nTotal: "+dw+" drawings",tag:"khuzam-today"})}catch(e){}
+}
+
+function startupAlert(){
+  const all=allItems();
+  const late=all.filter(LISTS.late.f).sort((a,b)=>a.due.localeCompare(b.due)||a.mod.localeCompare(b.mod));
+  const week=all.filter(LISTS.week.f).sort((a,b)=>a.due.localeCompare(b.due)||a.mod.localeCompare(b.mod)||BLD.indexOf(a.b)-BLD.indexOf(b.b));
+  if(!late.length&&!week.length)return false;
+  const dw=l=>l.reduce((a,i)=>a+(dwgs(i)||0),0);
+  const row=it=>{const st=status(it);const d=dwgs(it);return `<div class="al-row"><span class="al-d">${fmt(it.due)}<small>${DAY[wd(it.due)]} · ${DAR[wd(it.due)]}</small></span>
+    <span class="al-w"><span class="tag">${modName(it.mod).toUpperCase()}</span><span class="code">${it.b}</span><span class="el">${h(it.l)} · ${h(elShort(it.e))}</span><span class="code">${bi(PKC[it.p],PK_AR[it.p])}</span></span>
+    <span class="al-r"><span class="pill ${SCLS[st]}">${cdBi(it)}</span><span class="num">${d!=null?bi(plural(d,"dwg"),d+" لوحة"):bi("— dwgs","— لوحة")}</span></span></div>`};
+  const sec=(cls,t,a,l)=>l.length?`<div class="al-sec ${cls}"><div class="al-h"><b>${bi(t,a)}</b><span class="num">${bi(plural(l.length,"package")+" · "+plural(dw(l),"drawing"),l.length+" بند · "+dw(l)+" لوحة")}</span></div>${l.map(row).join("")}</div>`:"";
+  layer(`<div class="dlg alert" role="alertdialog" aria-modal="true" aria-labelledby="alT">
+    <div class="dlg-h"><small>${fmt(todayISO(),"full").toUpperCase()}<span class="ar">النهارده · ${DAR[wd(todayISO())]}</span></small><h3 id="alT">${bi("Delivery alert","تنبيه التسليمات")}</h3></div>
+    <div class="dlg-b" style="display:block">
+      ${sec("al-late","Overdue","متأخر",late)}
+      ${sec("al-week","Due in the next 7 days","مطلوب خلال 7 أيام",week)}
+    </div>
+    <div class="dlg-f"><button type="button" class="btn primary bi" data-close>${bi("Got it","تمام")}</button></div></div>`,null);
+  return true;
+}
+
+/* ---------- TIMELINE (Primavera-style Gantt) ---------- */
+const ZOOMS=[7,12,20,32];
+const LVC={GROUND:"GF",FIRST:"1F",SECOND:"2F",THIRD:"3F",FOURTH:"4F",FIFTH:"5F",SIXTH:"6F",SEVENTH:"7F",EIGHTH:"8F",ROOF:"RF","TOP ROOF":"TR"};
+function addDays(iso,n){const d=new Date(P(iso).t+n*864e5);return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate())}
+const dayDiff=(a,b)=>Math.round((P(b).t-P(a).t)/864e5);
+let _ds={src:null,map:{}};
+/* Default planned start: the previous delivery date for the same building + package (work runs in sequence);
+   if that is more than 10 days earlier, or this is the first one, start 3 days before the target. */
+function defStart(it){
+  if(_ds.src!==S.sched){_ds={src:S.sched,map:{}};
+    for(const m of MODS){const g={};for(const i of itemsOf(m)){const k=i.b+"|"+i.p;(g[k]=g[k]||[]).push(i)}
+      for(const k in g){const dues=[...new Set(g[k].map(i=>i.due))].sort();
+        for(const i of g[k]){const idx=dues.indexOf(i.due);const prev=idx>0?dues[idx-1]:null;
+          _ds.map[key(i)]=prev&&dayDiff(prev,i.due)<=10?prev:addDays(i.due,-3)}}}}
+  return _ds.map[key(it)]||addDays(it.due,-3);
+}
+function startOf(it){const x=S.status[key(it)];return x&&x.start&&x.start<=it.due?x.start:(it.start&&it.start<=it.due?it.start:defStart(it))}
+function tlState(){const d={mod:"all",b:"all",p:"all",z:2,done:"true",col:[]};S.view.tl=Object.assign(d,S.view.tl||{});if(!Array.isArray(S.view.tl.col))S.view.tl.col=[];return S.view.tl}
+function renderTimeline(){
+  const T=tlState();const col=new Set(T.col);
+  const seg=(k,opts)=>`<div class="seg" role="group">${opts.map(([v,l])=>`<button type="button" data-tlset="${k}:${v}" aria-pressed="${String(T[k])===String(v)}">${l}</button>`).join("")}</div>`;
+  let html=`<div class="mhead"><div><h1>${bi("Timeline","الجدول الزمني")}</h1><p>${bi("Gantt chart by Module → Building → Level → Activity. Click a bar to update it; hover for details.","جانت تشارت بالموديول ← المبنى ← الدور ← النشاط. اضغط على أي بار تحدّثه، وقف عليه تشوف تفاصيله.")}</p></div>
+    <div class="tl-zoom"><button type="button" class="btn bi" data-tltoday>${bi("Today","النهارده")}</button><button type="button" class="btn" data-tlzoom="-1" aria-label="Zoom out">−</button><span class="label">${bi("Zoom","تكبير")}</span><button type="button" class="btn" data-tlzoom="1" aria-label="Zoom in">+</button></div></div>
+  <div class="fbar tl-f">
+    <span class="label">${bi("Module","الموديول")}</span>${seg("mod",[["all",bi("All","الكل")],...MODS.map(m=>[m,bi("M"+m.slice(1),"م"+m.slice(1))])])}
+    <span class="label">${bi("Building","المبنى")}</span>${seg("b",[["all",bi("All","الكل")],...BLD.map(b=>[b,b])])}
+    <span class="label">${bi("Package","النوع")}</span>${seg("p",[["all",bi("All","الكل")],["CONC",bi("Concrete","خرسانة")],["RFT",bi("Reinf.","تسليح")]])}
+    ${seg("done",[["true",bi("Show delivered","اعرض المتسلّم")],["false",bi("Hide delivered","اخفي المتسلّم")]])}
+    <span class="label">${bi("Expand","فتح")}</span><div class="seg"><button type="button" data-gexp="all">${bi("Activities","الأنشطة")}</button><button type="button" data-gexp="levels">${bi("Levels","الأدوار")}</button><button type="button" data-gexp="bldg">${bi("Buildings","المباني")}</button></div>
+  </div>`;
+  if(!S.ready)return html+`<div class="empty"><p>Loading…</p></div>`;
+  // build WBS
+  const rows=[];const mods=T.mod==="all"?MODS:[T.mod];
+  const pass=i=>(T.p==="all"||i.p===T.p)&&(String(T.done)!=="false"||!isDone(i));
+  for(const m of mods){const refs=refsOf(m);const mRows=[];const mItems=[];
+    for(const b of BLD){if(T.b!=="all"&&T.b!==b)continue;
+      const ref=refs[b]&&refs[b]!==m?refs[b]:null;if(ref&&T.mod==="all")continue;
+      const it=bItems(m,b).filter(pass);if(!it.length)continue;mItems.push(...it);
+      const bid="b:"+m+":"+b;mRows.push({t:"b",id:bid,lv:1,name:"BUILDING "+b,ar:"مبنى "+b,ref,items:it,par:["m:"+m]});
+      const lv=LEVELS.filter(l=>it.some(i=>i.l===l)).concat([...new Set(it.map(i=>i.l))].filter(l=>!LEVELS.includes(l)));
+      for(const l of lv){const li=it.filter(i=>i.l===l).sort((a,b)=>a.due.localeCompare(b.due)||ELS.indexOf(a.e)-ELS.indexOf(b.e)||a.p.localeCompare(b.p));
+        const lid="l:"+m+":"+b+":"+l;mRows.push({t:"l",id:lid,lv:2,name:l,items:li,par:["m:"+m,bid]});
+        for(const i of li)mRows.push({t:"a",lv:3,it:i,par:["m:"+m,bid,lid]});
+      }}
+    if(mItems.length){rows.push({t:"m",id:"m:"+m,lv:0,name:modName(m).toUpperCase(),ar:modAr(m),items:mItems,par:[]});rows.push(...mRows)}
+  }
+  if(!rows.length)return html+`<div class="empty"><p>${bi("No activities match these filters.","مفيش أنشطة بالفلاتر دي.")}</p></div>`;
+  const vis=rows.filter(r=>!r.par.some(p=>col.has(p)));
+  const acts=rows.filter(r=>r.t==="a").map(r=>r.it);
+  const t0=todayISO();
+  let lo=t0,hi=t0;for(const i of acts){const s=startOf(i);if(s<lo)lo=s;if(i.due>hi)hi=i.due}
+  const start=addDays(lo,-3),end=addDays(hi,5);
+  const px=ZOOMS[T.z]||20;const n=dayDiff(start,end)+1;const W=n*px;
+  const X=iso=>dayDiff(start,iso)*px;
+  let months="",days="",cols="";let cm=-1;
+  for(let i=0;i<n;i++){const iso=addDays(start,i);const p=P(iso);const w=wd(iso);
+    if(p.m!==cm){cm=p.m;months+=`<span class="tl-mon" style="left:${i*px}px">${MON[p.m-1]} ${p.y}</span>`;if(i)cols+=`<i class="tl-mline" style="left:${i*px}px"></i>`}
+    if(w===5||w===6)cols+=`<i class="tl-wk" style="left:${i*px}px;width:${px}px"></i>`;
+    if(px>=12||w===6)days+=`<span class="tl-day${iso===t0?" now":""}${w===5||w===6?" we":""}" style="left:${i*px}px;width:${px>=12?px:px*7}px">${p.d}${px>=20?`<small>${DAY[w][0]}</small>`:""}</span>`;
+  }
+  const tx=X(t0)+px/2;cols+=`<i class="tl-now" style="left:${tx}px"></i>`;
+  const sumOf=items=>{let s=null,f=null;for(const i of items){const a=startOf(i);if(!s||a<s)s=a;if(!f||i.due>f)f=i.due}const st=stats(items);return {s,f,st}};
+  let grid="",bars="";
+  for(const r of vis){
+    if(r.t==="a"){const it=r.it;const s=startOf(it),st=status(it),d=dwgs(it);const dur=dayDiff(s,it.due);
+      grid+=`<div class="g-row g-a"><div class="g-c g-name" style="--ind:${r.lv}"><span class="g-act">${h(it.e)}</span><span class="code">${PKC[it.p]}</span></div><div class="g-c num">${fmt(s)}</div><div class="g-c num">${fmt(it.due)}</div><div class="g-c num r">${dur}d</div><div class="g-c num r">${d??"—"}</div><div class="g-c"><span class="pill ${SCLS[st]}">${st==="done"?"100%":ST[st]}</span></div></div>`;
+      const x1=X(s),x2=X(it.due)+px;
+      bars+=`<div class="g-row g-a"><button type="button" class="g-bar ${it.p==="CONC"?"cc":"rf"} st-${st}" style="left:${x1}px;width:${Math.max(px,x2-x1)}px" data-keys="${h(key(it))}" aria-label="${h(it.l+" "+it.e+" "+PK[it.p]+" "+fmt(it.due))}"></button><span class="g-lbl" style="left:${x2+6}px">${h(elShort(it.e))} · ${PKC[it.p]}${d?" · "+d+" dwgs":""}</span></div>`;
+      continue}
+    const {s,f,st}=sumOf(r.items);const open=!col.has(r.id);const pc=pct(st.done,st.total);
+    grid+=`<div class="g-row g-${r.t}"><div class="g-c g-name" style="--ind:${r.lv}"><button type="button" class="g-tog" data-gtog="${h(r.id)}" aria-expanded="${open}">${open?"▾":"▸"}</button><b>${h(r.name)}</b>${r.ar?`<span class="ar g-ar">${r.ar}</span>`:""}${r.ref?`<span class="pill info">${bi("= "+modName(r.ref),"نفس "+modAr(r.ref))}</span>`:""}${st.late?`<span class="pill bad">${st.late}</span>`:""}</div><div class="g-c num">${fmt(s)}</div><div class="g-c num">${fmt(f)}</div><div class="g-c num r">${dayDiff(s,f)}d</div><div class="g-c num r">${st.dw}</div><div class="g-c"><span class="g-pc"><i style="width:${pc}%"></i></span><span class="num">${pc}%</span></div></div>`;
+    const x1=X(s),x2=X(f)+px;
+    bars+=`<div class="g-row g-${r.t}"><span class="g-sum${st.late?" late":""}" style="left:${x1}px;width:${x2-x1}px"><i style="width:${pc}%"></i></span>${r.t!=="m"?`<span class="g-lbl s" style="left:${x2+8}px">${h(r.name)}</span>`:""}</div>`;
+  }
+  html+=`<div class="tl-legend legend"><span><i class="g-key cc"></i>${bi("Concrete","خرسانة")}</span><span><i class="g-key rf"></i>${bi("Reinforcement","تسليح")}</span><span><i class="g-key sum"></i>${bi("Summary (WBS)","ملخص")}</span>${["late","soon","week","later","done"].map(k=>`<span><i class="dot ${SCLS[k]}"></i>${bi(ST[k],ST_AR[k])}</span>`).join("")}<span><i class="g-key dd"></i>${bi("Data date (today)","النهارده")}</span></div>
+  <div class="tl-wrap g-wrap" id="tlWrap"><div class="g" style="width:calc(var(--gw) + ${W}px)">
+    <div class="g-left">
+      <div class="g-row g-hd"><div class="g-c g-name">${bi("Activity","النشاط")}</div><div class="g-c">${bi("Start","البداية")}</div><div class="g-c">${bi("Finish","التسليم")}</div><div class="g-c r">${bi("Dur.","المدة")}</div><div class="g-c r">${bi("Dwgs","لوحات")}</div><div class="g-c">${bi("Status","الحالة")}</div></div>
+      ${grid}
+    </div>
+    <div class="g-right" style="width:${W}px">
+      <div class="g-row g-hd g-scale"><div class="tl-months">${months}</div><div class="tl-days">${days}</div></div>
+      <div class="g-cols">${cols}</div>
+      ${bars}
+    </div>
+  </div></div>
+  <p class="muted" style="margin:-8px 0 0;font-size:12.5px">${bi("Start and Finish (initial issue) come from the KHUZAM PARK Gantt. Closure dates are in each activity's details. You can change a start date from the activity's update window.","البداية والتسليم (Initial issue) من جانت الخزام، وميعاد الـ Closure موجود في تفاصيل كل نشاط. وتقدر تغيّر البداية من نافذة تحديث النشاط.")}</p>`;
+  S._tlTodayX=tx;
+  return html;
+}
+function tlItems(keys){const set=new Set(keys.split(","));return allItems().filter(i=>set.has(key(i)))}
+function openGroup(keys){
+  const list=tlItems(keys);if(list.length===1)return openItem(key(list[0]));
+  const it=list[0];const dw=list.reduce((a,i)=>a+(dwgs(i)||0),0);
+  layer(`<div class="dlg wide" role="dialog" aria-modal="true" aria-labelledby="gT"><div class="dlg-h"><small>${modName(it.mod).toUpperCase()} · BUILDING ${it.b} · ${h(it.l)}</small><h3 id="gT">${bi(fmt(it.due,"full")+" · "+PK[it.p],DAR[wd(it.due)]+" · "+PK_AR[it.p])}</h3></div>
+    <div class="dlg-b"><p class="muted" style="margin:0 0 10px">${bi(plural(list.length,"package")+" · "+plural(dw,"drawing"),list.length+" بند · "+dw+" لوحة")}</p>${logTable(list)}</div>
+    <div class="dlg-f"><button type="button" class="btn bi" data-close>${bi("Close","إغلاق")}</button></div></div>`,null);
+}
+function tlTip(el){
+  let tip=$("#tltip");if(!tip){tip=document.createElement("div");tip.id="tltip";tip.setAttribute("role","tooltip");document.body.appendChild(tip)}
+  const list=tlItems(el.dataset.keys);if(!list.length)return;const it=list[0];const sd=startOf(it);
+  tip.innerHTML=`<div class="tt-h">${modName(it.mod)} · ${it.b} · ${h(it.l)} <span>${PKC[it.p]}</span></div><div class="tt-d">${fmt(sd,"day")} → ${fmt(it.due,"day")} · ${dayDiff(sd,it.due)}d</div>`+list.map(i=>`<div class="tt-r"><span>${h(i.e)}</span><span>${dwgs(i)??"—"} dwgs</span><span class="pill ${SCLS[status(i)]}">${countdown(i)}</span></div>`).join("");
+  tip.hidden=false;const r=el.getBoundingClientRect();
+  let x=r.left+r.width/2-tip.offsetWidth/2;x=Math.max(8,Math.min(x,window.innerWidth-tip.offsetWidth-8));
+  let y=r.top-tip.offsetHeight-8;if(y<8)y=r.bottom+8;tip.style.left=x+"px";tip.style.top=y+"px";
+}
+function tlHide(){const t=$("#tltip");if(t)t.hidden=true}
+document.addEventListener("mouseover",e=>{const c=e.target.closest(".tl-chip,.g-bar");if(c)tlTip(c);else tlHide()});
+document.addEventListener("focusin",e=>{const c=e.target.closest&&e.target.closest(".tl-chip,.g-bar");if(c)tlTip(c)});
+document.addEventListener("scroll",tlHide,true);
+function tlScrollToday(smooth){const w=$("#tlWrap");if(w&&S._tlTodayX!=null)w.scrollTo({left:Math.max(0,S._tlTodayX-140),behavior:smooth?"smooth":"auto"})}
+
+/* ---------- RENDER + EVENTS ---------- */
+function render(){
+  const t=todayISO();$("#asof").innerHTML="Today · "+fmt(t,"full")+'<span class="ar">النهارده · '+DAR[wd(t)]+"</span>";
+  const v=S.view;const cur=v.screen==="mod"?v.mod:v.screen==="tl"?"tl":"home";
+  const ow=$("#tlWrap");const keep=ow?{x:ow.scrollLeft,y:ow.scrollTop}:null;
+  $("#views").innerHTML=`<button type="button" class="exec" data-home aria-pressed="${cur==="home"}">${bi("Overview","الملخص")}</button><button type="button" data-tlgo aria-pressed="${cur==="tl"}">${bi("Timeline","الجدول الزمني")}</button>`+MODS.map(m=>`<button type="button" data-go="${m}" aria-pressed="${cur===m}">${bi(modName(m),modAr(m))}</button>`).join("");
+  const c=$("#conn");c.className="conn "+(S.conn==="live"?"live":S.conn==="off"?"off":"");c.lastElementChild.textContent=S.conn==="live"?(S.store==="supabase"?"Live · Shared":"This device only · على الجهاز ده"):S.conn==="off"?"Offline · غير متصل":"Connecting…";
+  tlHide();
+  $("#app").innerHTML=v.screen==="mod"&&v.mod?renderModule():v.screen==="tl"?renderTimeline():renderHome();
+  if(v.screen==="tl"){const w=$("#tlWrap");if(w){if(keep&&!S._tlJump){w.scrollLeft=keep.x;w.scrollTop=keep.y}else if(S.ready){tlScrollToday(false);S._tlJump=false}}}
+  renderNotice();sysNotify();
+}
+document.addEventListener("click",e=>{
+  const t=e.target.closest("button,[data-scrim]");if(!t)return;
+  if(t.matches("[data-scrim]")){if(e.target===t)closeLayer();return}
+  if(t.dataset.go)return go({screen:"mod",mod:t.dataset.go,filter:"all"});
+  if(t.hasAttribute("data-home"))return go({screen:"home"});
+  if(t.hasAttribute("data-tlgo")){S._tlJump=true;return go({screen:"tl"})}
+  if(t.dataset.tlset){const [k,v]=t.dataset.tlset.split(":");const T=tlState();T[k]=k==="z"?+v:v;saveView();S._tlJump=true;render();return}
+  if(t.dataset.tlzoom){const T=tlState();T.z=Math.max(0,Math.min(ZOOMS.length-1,T.z+ +t.dataset.tlzoom));saveView();S._tlJump=true;render();return}
+  if(t.hasAttribute("data-tltoday"))return tlScrollToday(true);
+  if(t.dataset.keys)return openGroup(t.dataset.keys);
+  if(t.dataset.gtog){const T=tlState();const i=T.col.indexOf(t.dataset.gtog);if(i>=0)T.col.splice(i,1);else T.col.push(t.dataset.gtog);saveView();render();return}
+  if(t.dataset.gexp){const T=tlState();const ids=[];const kind=t.dataset.gexp;
+    if(kind!=="all")for(const m of MODS)for(const b of BLD){if(kind==="bldg")ids.push("b:"+m+":"+b);else for(const l of LEVELS)ids.push("l:"+m+":"+b+":"+l)}
+    T.col=ids;saveView();render();return}
+  if(t.dataset.gob){const [m,b]=t.dataset.gob.split(":");return go({screen:"mod",mod:m,b,filter:"all"})}
+  if(t.dataset.b){S.view.b=t.dataset.b;saveView();render();const m=$("#matrix");m&&m.scrollIntoView({behavior:"smooth",block:"start"});return}
+  if(t.dataset.f){S.view.filter=t.dataset.f;saveView();render();return}
+  if(t.dataset.open)return openItem(t.dataset.open);
+  if(t.dataset.list)return openList(t.dataset.list);
+  if(t.hasAttribute("data-dismiss")){try{localStorage.setItem(noticeKey(),"1")}catch(x){}$("#notice").innerHTML="";return}
+  if(t.hasAttribute("data-sysnotif")){try{Notification.requestPermission().then(()=>{render();if(Notification.permission==="granted")toast("Desktop alerts on · التنبيهات اشتغلت")})}catch(x){}return}
+  if(t.hasAttribute("data-close"))return closeLayer();
+  if(t.dataset.save&&onSave){t.disabled=true;Promise.resolve(onSave(t)).finally(()=>{t.disabled=false});return}
+  if(t.hasAttribute("data-import")){if(!S.db){toast("Uploading isn't available in this view.");return}$("#xlsIn").value="";$("#xlsIn").click()}
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeLayer()});
+$("#xlsIn").addEventListener("change",e=>{const f=e.target.files[0];if(f)importFile(f)});
+setInterval(()=>{if(!$("#layer").innerHTML)render()},30*60*1000);
+
+render();
+/* ================= DATA STORE =================
+   Leave both values empty  → data is saved in this browser only.
+   Fill both (Supabase → Project Settings → API) → shared, live for the whole team.
+   Run the SQL in README.md once in Supabase → SQL Editor before using it. */
+const CONFIG={SUPABASE_URL:"",SUPABASE_ANON_KEY:""};
+const SEED={M1:{"module": "M1", "source": "KHUZAM_PARK_Gantt_Chart_Updated_1.xlsx", "sheet": "Gantt Schedule", "importedAt": "2026-10-18T19:55:00.000Z", "items": [{"id": "Z-FIRST-STRUCTURE-CONC", "b": "Z", "l": "FIRST", "e": "STRUCTURE", "p": "CONC", "start": "2026-10-30", "due": "2026-11-19", "closure": "2026-11-30", "pkg": "P06", "dwgs": 39, "note": "Package P06 · CONCRETE DIMENSIONS / Module 1 / First · Initial issue 2026-11-19 · Closure 2026-11-30"}, {"id": "Z-FIRST-STRUCTURE-RFT", "b": "Z", "l": "FIRST", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-03", "due": "2026-11-19", "closure": "2026-11-30", "pkg": "P08", "dwgs": 108, "note": "Package P08 · REINFORCEMENT / Module 1 / First · Initial issue 2026-11-19 · Closure 2026-11-30"}, {"id": "A-SECOND-STRUCTURE-CONC", "b": "A", "l": "SECOND", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-24", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P17", "dwgs": 12, "note": "Package P17 · CONCRETE DIMENSIONS / Tower A / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "A-THIRD-STRUCTURE-CONC", "b": "A", "l": "THIRD", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-24", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P17", "dwgs": 12, "note": "Package P17 · CONCRETE DIMENSIONS / Tower A / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "A-FOURTH-STRUCTURE-CONC", "b": "A", "l": "FOURTH", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-24", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P17", "dwgs": 12, "note": "Package P17 · CONCRETE DIMENSIONS / Tower A / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "A-FIFTH-STRUCTURE-CONC", "b": "A", "l": "FIFTH", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-24", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P17", "dwgs": 12, "note": "Package P17 · CONCRETE DIMENSIONS / Tower A / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "A-SIXTH-STRUCTURE-CONC", "b": "A", "l": "SIXTH", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-24", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P17", "dwgs": 12, "note": "Package P17 · CONCRETE DIMENSIONS / Tower A / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "A-ROOF-STRUCTURE-CONC", "b": "A", "l": "ROOF", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-28", "due": "2026-12-24", "closure": "2026-12-31", "pkg": "P18", "dwgs": 12, "note": "Package P18 · CONCRETE DIMENSIONS / Tower A / Roof · Initial issue 2026-12-24 · Closure 2026-12-31"}, {"id": "A-TOP_ROOF-STRUCTURE-CONC", "b": "A", "l": "TOP ROOF", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-28", "due": "2026-12-24", "closure": "2026-12-31", "pkg": "P18", "dwgs": 1, "note": "Package P18 · CONCRETE DIMENSIONS / Tower A / Roof · Initial issue 2026-12-24 · Closure 2026-12-31"}, {"id": "A-SECOND-STRUCTURE-RFT", "b": "A", "l": "SECOND", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-26", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P19", "dwgs": 34, "note": "Package P19 · REINFORCEMENT / Tower A / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "A-THIRD-STRUCTURE-RFT", "b": "A", "l": "THIRD", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-26", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P19", "dwgs": 34, "note": "Package P19 · REINFORCEMENT / Tower A / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "A-FOURTH-STRUCTURE-RFT", "b": "A", "l": "FOURTH", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-26", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P19", "dwgs": 34, "note": "Package P19 · REINFORCEMENT / Tower A / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "A-FIFTH-STRUCTURE-RFT", "b": "A", "l": "FIFTH", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-26", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P19", "dwgs": 36, "note": "Package P19 · REINFORCEMENT / Tower A / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "A-SIXTH-STRUCTURE-RFT", "b": "A", "l": "SIXTH", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-26", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P19", "dwgs": 34, "note": "Package P19 · REINFORCEMENT / Tower A / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "A-ROOF-STRUCTURE-RFT", "b": "A", "l": "ROOF", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-30", "due": "2026-12-24", "closure": "2026-12-31", "pkg": "P20", "dwgs": 30, "note": "Package P20 · REINFORCEMENT / Tower A / Roof · Initial issue 2026-12-24 · Closure 2026-12-31"}, {"id": "A-TOP_ROOF-STRUCTURE-RFT", "b": "A", "l": "TOP ROOF", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-30", "due": "2026-12-24", "closure": "2026-12-31", "pkg": "P20", "dwgs": 12, "note": "Package P20 · REINFORCEMENT / Tower A / Roof · Initial issue 2026-12-24 · Closure 2026-12-31"}, {"id": "B-SECOND-STRUCTURE-CONC", "b": "B", "l": "SECOND", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-24", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P21", "dwgs": 11, "note": "Package P21 · CONCRETE DIMENSIONS / Tower B / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "B-THIRD-STRUCTURE-CONC", "b": "B", "l": "THIRD", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-24", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P21", "dwgs": 11, "note": "Package P21 · CONCRETE DIMENSIONS / Tower B / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "B-FOURTH-STRUCTURE-CONC", "b": "B", "l": "FOURTH", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-24", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P21", "dwgs": 11, "note": "Package P21 · CONCRETE DIMENSIONS / Tower B / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "B-FIFTH-STRUCTURE-CONC", "b": "B", "l": "FIFTH", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-24", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P21", "dwgs": 11, "note": "Package P21 · CONCRETE DIMENSIONS / Tower B / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "B-SIXTH-STRUCTURE-CONC", "b": "B", "l": "SIXTH", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-24", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P21", "dwgs": 11, "note": "Package P21 · CONCRETE DIMENSIONS / Tower B / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "B-ROOF-STRUCTURE-CONC", "b": "B", "l": "ROOF", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-28", "due": "2026-12-24", "closure": "2026-12-31", "pkg": "P22", "dwgs": 11, "note": "Package P22 · CONCRETE DIMENSIONS / Tower B / Roof · Initial issue 2026-12-24 · Closure 2026-12-31"}, {"id": "B-TOP_ROOF-STRUCTURE-CONC", "b": "B", "l": "TOP ROOF", "e": "STRUCTURE", "p": "CONC", "start": "2026-11-28", "due": "2026-12-24", "closure": "2026-12-31", "pkg": "P22", "dwgs": 1, "note": "Package P22 · CONCRETE DIMENSIONS / Tower B / Roof · Initial issue 2026-12-24 · Closure 2026-12-31"}, {"id": "B-SECOND-STRUCTURE-RFT", "b": "B", "l": "SECOND", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-26", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P23", "dwgs": 29, "note": "Package P23 · REINFORCEMENT / Tower B / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "B-THIRD-STRUCTURE-RFT", "b": "B", "l": "THIRD", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-26", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P23", "dwgs": 32, "note": "Package P23 · REINFORCEMENT / Tower B / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "B-FOURTH-STRUCTURE-RFT", "b": "B", "l": "FOURTH", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-26", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P23", "dwgs": 29, "note": "Package P23 · REINFORCEMENT / Tower B / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "B-FIFTH-STRUCTURE-RFT", "b": "B", "l": "FIFTH", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-26", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P23", "dwgs": 29, "note": "Package P23 · REINFORCEMENT / Tower B / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "B-SIXTH-STRUCTURE-RFT", "b": "B", "l": "SIXTH", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-26", "due": "2026-12-22", "closure": "2026-12-31", "pkg": "P23", "dwgs": 29, "note": "Package P23 · REINFORCEMENT / Tower B / Upper floors · Initial issue 2026-12-22 · Closure 2026-12-31"}, {"id": "B-ROOF-STRUCTURE-RFT", "b": "B", "l": "ROOF", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-30", "due": "2026-12-24", "closure": "2026-12-31", "pkg": "P24", "dwgs": 29, "note": "Package P24 · REINFORCEMENT / Tower B / Roof · Initial issue 2026-12-24 · Closure 2026-12-31"}, {"id": "B-TOP_ROOF-STRUCTURE-RFT", "b": "B", "l": "TOP ROOF", "e": "STRUCTURE", "p": "RFT", "start": "2026-11-30", "due": "2026-12-24", "closure": "2026-12-31", "pkg": "P24", "dwgs": 12, "note": "Package P24 · REINFORCEMENT / Tower B / Roof · Initial issue 2026-12-24 · Closure 2026-12-31"}]},M2:{"module":"M2","source":"KHUZAM_PARK_Gantt_Chart_Updated_1.xlsx","sheet":"Gantt Schedule","importedAt":"2026-10-18T19:55:00.000Z","items":[{"id":"Z-FIRST-STRUCTURE-CONC","b":"Z","l":"FIRST","e":"STRUCTURE","p":"CONC","start":"2026-10-30","due":"2026-11-19","closure":"2026-11-30","pkg":"P10","dwgs":39,"note":"Package P10 · CONCRETE DIMENSIONS / Module 2 / First · Initial issue 2026-11-19 · Closure 2026-11-30"},{"id":"Z-FIRST-STRUCTURE-RFT","b":"Z","l":"FIRST","e":"STRUCTURE","p":"RFT","start":"2026-11-03","due":"2026-11-19","closure":"2026-11-30","pkg":"P12","dwgs":108,"note":"Package P12 · REINFORCEMENT / Module 2 / First · Initial issue 2026-11-19 · Closure 2026-11-30"}],"refs":{"A":"M1","B":"M1"}},M3:{"module":"M3","source":"KHUZAM_PARK_Gantt_Chart_Updated_1.xlsx","sheet":"Gantt Schedule","importedAt":"2026-10-18T19:55:00.000Z","items":[{"id":"Z-FIRST-STRUCTURE-CONC","b":"Z","l":"FIRST","e":"STRUCTURE","p":"CONC","start":"2026-10-30","due":"2026-11-19","closure":"2026-11-30","pkg":"P14","dwgs":39,"note":"Package P14 · CONCRETE DIMENSIONS / Module 3 / First · Initial issue 2026-11-19 · Closure 2026-11-30"},{"id":"Z-FIRST-STRUCTURE-RFT","b":"Z","l":"FIRST","e":"STRUCTURE","p":"RFT","start":"2026-11-03","due":"2026-11-19","closure":"2026-11-30","pkg":"P16","dwgs":108,"note":"Package P16 · REINFORCEMENT / Module 3 / First · Initial issue 2026-11-19 · Closure 2026-11-30"}],"refs":{"A":"M1","B":"M1"}}};
+const SEED_VER="2026-10-18-gantt";  /* change this to push new built-in schedules to everyone */
+
+function localStore(){
+  const K="khuzam-tracker-data";const subs={schedules:[],status:[]};
+  let data;try{data=JSON.parse(localStorage.getItem(K)||"null")}catch(e){}
+  if(!data||typeof data!=="object")data={schedules:{},status:{}};
+  data.schedules=data.schedules||{};data.status=data.status||{};
+  if(data.seedVer!==SEED_VER){Object.assign(data.schedules,SEED);data.seedVer=SEED_VER;save()}
+  function save(){try{localStorage.setItem(K,JSON.stringify(data))}catch(e){}}
+  const snap=c=>({docs:Object.entries(data[c]).map(([id,v])=>({id,data:()=>v}))});
+  const emit=c=>subs[c].forEach(f=>f(snap(c)));
+  window.addEventListener("storage",e=>{if(e.key===K){try{data=JSON.parse(e.newValue)||data}catch(x){}emit("schedules");emit("status")}});
+  return {kind:"local",collection:c=>({
+    onSnapshot(f){subs[c].push(f);setTimeout(()=>f(snap(c)),0);return ()=>{}},
+    doc:id=>({set:async body=>{data[c][id]=body;save();emit(c)}})})};
+}
+function supaStore(){
+  const sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY);
+  const T="khuzam_store";const subs={schedules:[],status:[]};
+  async function pull(c){
+    const {data,error}=await sb.from(T).select("id,data").eq("collection",c);
+    if(error)throw error;
+    const s={docs:data.map(r=>({id:r.id,data:()=>r.data}))};subs[c].forEach(f=>f(s));return data;
+  }
+  async function put(c,id,body){const {error}=await sb.from(T).upsert({collection:c,id,data:body,updated_at:new Date().toISOString()});if(error)throw error}
+  sb.channel("khuzam").on("postgres_changes",{event:"*",schema:"public",table:T},p=>{const c=(p.new&&p.new.collection)||(p.old&&p.old.collection);if(subs[c])pull(c).catch(()=>{})}).subscribe();
+  setInterval(()=>{pull("schedules").catch(()=>{});pull("status").catch(()=>{})},30000);
+  return {kind:"supabase",
+    async init(){const rows=await sb.from(T).select("id").eq("collection","schedules");if(rows.error)throw rows.error;
+      const meta=await sb.from(T).select("data").eq("collection","meta").eq("id","seed");if(meta.error)throw meta.error;if(!meta.data.length||meta.data[0].data.ver!==SEED_VER){for(const [id,doc] of Object.entries(SEED))await put("schedules",id,doc);await put("meta","seed",{ver:SEED_VER})}},
+    collection:c=>({
+      onSnapshot(f,err){subs[c].push(f);pull(c).catch(e=>err&&err(e));return ()=>{}},
+      doc:id=>({set:async body=>{await put(c,id,body);await pull(c)}})})};
+}
+var SYS_NOTIFY=true;
+setInterval(()=>{try{sysNotify()}catch(e){}},15*60*1000);
+
+(async()=>{
+  let db;
+  const useSupa=CONFIG.SUPABASE_URL&&CONFIG.SUPABASE_ANON_KEY&&window.supabase;
+  try{db=useSupa?supaStore():localStore();if(db.init)await db.init()}
+  catch(e){console.error(e);S.conn="off";S.connErr="Couldn't reach Supabase. Check the URL, key and the khuzam_store table.";render();return}
+  S.db=db;S.canWrite=true;S.store=db.kind;
+  let gS=false,gT=false;
+  const upd=()=>{S.ready=gS&&gT;if(!$("#layer").innerHTML)render();if(S.ready&&!S.alertShown){S.alertShown=true;if(!$("#layer").innerHTML)startupAlert()}};
+  db.collection("schedules").onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]=d.data()});S.sched=o;gS=true;S.conn="live";upd()},()=>{S.conn="off";render()});
+  db.collection("status").onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]=d.data()});S.status=o;gT=true;upd()},()=>{S.conn="off";render()});
+})();
+})();
+</script>
+
+</body>
+</html>
